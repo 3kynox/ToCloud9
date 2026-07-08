@@ -75,6 +75,31 @@ func TestParseUpdateObjectStatsValuesBlock(t *testing.T) {
 	assert.Equal(t, uint32(12), *upd.Level)
 }
 
+// TestParseUpdateObjectStatsReadsCorrectMaxPowerSlot pins the max-power field index to
+// UNIT_FIELD_MAXPOWER1 (OBJECT_END+0x1B). The field map uses literal 3.3.5a indices as an
+// independent oracle, so a wrong constant (e.g. reading MAXPOWER7's slot) is caught here.
+func TestParseUpdateObjectStatsReadsCorrectMaxPowerSlot(t *testing.T) {
+	const (
+		fieldBytes0    = 0x6 + 0x11
+		fieldPower1    = 0x6 + 0x13 // current mana
+		fieldMaxPower1 = 0x6 + 0x1B // max mana
+		fieldMaxPower7 = 0x6 + 0x21 // decoy, must not be read as max mana
+	)
+	data := selfValuesBlockPacket(map[int]uint32{
+		fieldBytes0:    0x00 << 24, // power type: mana (0)
+		fieldPower1:    50,
+		fieldMaxPower1: 200,
+		fieldMaxPower7: 999,
+	})
+
+	upd, err := ParseUpdateObjectStatsForGUID(data, testCharGUID)
+	require.NoError(t, err)
+	require.NotNil(t, upd.Powers[0])
+	assert.Equal(t, uint32(50), *upd.Powers[0])
+	require.NotNil(t, upd.MaxPowers[0])
+	assert.Equal(t, uint32(200), *upd.MaxPowers[0])
+}
+
 func TestParseUpdateObjectStatsIgnoresOtherGUIDs(t *testing.T) {
 	w := NewWriter(SMsgUpdateObject)
 	w.Uint32(1)

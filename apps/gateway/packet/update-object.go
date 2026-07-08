@@ -17,7 +17,7 @@ const (
 	unitFieldHealth    = objectEnd + 0x12
 	unitFieldPower1    = objectEnd + 0x13
 	unitFieldMaxHealth = objectEnd + 0x1A
-	unitFieldMaxPower1 = objectEnd + 0x21
+	unitFieldMaxPower1 = objectEnd + 0x1B
 	unitFieldLevel     = objectEnd + 0x30
 
 	powersCount = 7
