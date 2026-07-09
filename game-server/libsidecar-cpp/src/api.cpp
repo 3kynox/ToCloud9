@@ -51,6 +51,8 @@ struct TC9State {
     uint32_t realm_id = 0;
 };
 
+TC9State g_state;
+
 // Mirrors shared/events/events-gateway.go GatewayEvent values and the
 // EventToSendGenericPayload envelope so Go consumers decode transparently.
 constexpr int kEventCharacterLoggedIn = 1;
@@ -75,8 +77,6 @@ void PublishCharacterEvent(int eventType, const char* subject, nlohmann::json pa
 
     g_state.nats_publisher->Publish(subject, envelope.dump());
 }
-
-TC9State g_state;
 
 }  // anonymous namespace
 
