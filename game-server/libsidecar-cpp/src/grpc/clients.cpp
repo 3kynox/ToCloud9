@@ -2,6 +2,7 @@
 #include "servers-registry/registry.grpc.pb.h"
 #include "guid/guid.grpc.pb.h"
 #include "matchmaking/matchmaking.grpc.pb.h"
+#include "group/group.grpc.pb.h"
 #include <spdlog/spdlog.h>
 
 namespace tc9 {
@@ -20,13 +21,15 @@ GrpcClients::~GrpcClients() {
 
 void GrpcClients::Connect(const std::string& registry_addr,
                           const std::string& guid_addr,
-                          const std::string& matchmaking_addr) {
+                          const std::string& matchmaking_addr,
+                          const std::string& group_addr) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     spdlog::info("Connecting to gRPC services:");
     spdlog::info("  - Registry: {}", registry_addr);
     spdlog::info("  - GUID: {}", guid_addr);
     spdlog::info("  - Matchmaking: {}", matchmaking_addr);
+    spdlog::info("  - Group: {}", group_addr);
 
     // Create channels (using insecure credentials for now)
     registry_channel_ = grpc::CreateChannel(
@@ -35,14 +38,48 @@ void GrpcClients::Connect(const std::string& registry_addr,
         guid_addr, grpc::InsecureChannelCredentials());
     matchmaking_channel_ = grpc::CreateChannel(
         matchmaking_addr, grpc::InsecureChannelCredentials());
+    group_channel_ = grpc::CreateChannel(
+        group_addr, grpc::InsecureChannelCredentials());
 
     // Create stubs
     registry_stub_ = v1::ServersRegistryService::NewStub(registry_channel_);
     guid_stub_ = v1::GuidService::NewStub(guid_channel_);
     matchmaking_stub_ = v1::MatchmakingService::NewStub(matchmaking_channel_);
+    group_stub_ = v1::GroupService::NewStub(group_channel_);
 
     connected_ = true;
     spdlog::info("✅ All gRPC clients connected");
+}
+
+bool GrpcClients::AcceptGroupInvite(uint32_t realm_id, uint64_t player_guid) {
+    if (!connected_ || !group_stub_) {
+        spdlog::error("Group client not connected");
+        return false;
+    }
+
+    v1::AcceptInviteParams request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_player(player_guid);
+
+    v1::AcceptInviteResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = group_stub_->AcceptInvite(&context, request, &response);
+    if (!status.ok()) {
+        spdlog::error("AcceptGroupInvite failed for player {}: {}",
+                      player_guid, status.error_message());
+        return false;
+    }
+
+    if (response.status() != v1::AcceptInviteResponse::Ok) {
+        spdlog::warn("AcceptGroupInvite rejected for player {}: status {}",
+                     player_guid, int(response.status()));
+        return false;
+    }
+
+    return true;
 }
 
 void GrpcClients::Shutdown() {
@@ -57,10 +94,12 @@ void GrpcClients::Shutdown() {
     registry_stub_.reset();
     guid_stub_.reset();
     matchmaking_stub_.reset();
+    group_stub_.reset();
 
     registry_channel_.reset();
     guid_channel_.reset();
     matchmaking_channel_.reset();
+    group_channel_.reset();
 
     connected_ = false;
 }

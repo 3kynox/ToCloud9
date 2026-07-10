@@ -139,7 +139,8 @@ TC9_API void TC9InitLib(
         g_state.grpc_clients->Connect(
             config.servers_registry_address(),
             config.guid_provider_address(),
-            config.matchmaking_address()
+            config.matchmaking_address(),
+            config.group_service_address()
         );
 
         // Start NATS consumer
@@ -470,6 +471,14 @@ TC9_API int TC9NatsSubscribe(const char* subject, TC9NatsMessageHandler handler)
         [handler](const std::string& subj, const std::string& payload) {
             handler(subj.c_str(), payload.c_str(), static_cast<int>(payload.size()));
         }) ? 0 : -1;
+}
+
+TC9_API int TC9GroupAcceptInvite(uint64_t playerGUID) {
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->AcceptGroupInvite(g_state.realm_id, playerGUID) ? 0 : -1;
 }
 
 TC9_API void TC9PlayerLeftBattleground(
