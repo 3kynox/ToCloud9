@@ -446,6 +446,32 @@ TC9_API void TC9CharacterLevelChanged(uint64_t charGUID, uint8_t level) {
     }
 }
 
+TC9_API int TC9NatsPublish(const char* subject, const char* payload, int payloadLen) {
+    if (!subject || !payload || payloadLen <= 0) {
+        return -1;
+    }
+    if (!g_state.initialized || !g_state.nats_publisher) {
+        return -1;
+    }
+
+    return g_state.nats_publisher->Publish(subject, std::string(payload, payloadLen)) ? 0 : -1;
+}
+
+TC9_API int TC9NatsSubscribe(const char* subject, TC9NatsMessageHandler handler) {
+    if (!subject || !handler) {
+        return -1;
+    }
+    if (!g_state.nats_consumer) {
+        return -1;
+    }
+
+    return g_state.nats_consumer->SubscribeGeneric(
+        subject,
+        [handler](const std::string& subj, const std::string& payload) {
+            handler(subj.c_str(), payload.c_str(), static_cast<int>(payload.size()));
+        }) ? 0 : -1;
+}
+
 TC9_API void TC9PlayerLeftBattleground(
     uint64_t playerGUID,
     uint32_t realmID,
