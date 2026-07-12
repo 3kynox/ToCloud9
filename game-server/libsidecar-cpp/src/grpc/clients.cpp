@@ -82,6 +82,31 @@ bool GrpcClients::AcceptGroupInvite(uint32_t realm_id, uint64_t player_guid) {
     return true;
 }
 
+bool GrpcClients::LeaveGroup(uint32_t realm_id, uint64_t player_guid) {
+    if (!connected_ || !group_stub_) {
+        spdlog::error("Group client not connected");
+        return false;
+    }
+
+    v1::GroupLeaveParams request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_player(player_guid);
+
+    v1::GroupLeaveResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = group_stub_->Leave(&context, request, &response);
+    if (!status.ok()) {
+        spdlog::error("LeaveGroup failed for player {}: {}",
+                      player_guid, status.error_message());
+        return false;
+    }
+
+    return true;
+}
+
 void GrpcClients::Shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
 

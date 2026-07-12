@@ -66,6 +66,10 @@ public:
         uint32_t realm_id,
         uint64_t player_guid);
 
+    bool LeaveGroup(
+        uint32_t realm_id,
+        uint64_t player_guid);
+
     void Shutdown();
 
     GrpcClients(const GrpcClients&) = delete;

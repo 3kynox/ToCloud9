@@ -481,6 +481,14 @@ TC9_API int TC9GroupAcceptInvite(uint64_t playerGUID) {
     return g_state.grpc_clients->AcceptGroupInvite(g_state.realm_id, playerGUID) ? 0 : -1;
 }
 
+TC9_API int TC9GroupLeave(uint64_t playerGUID) {
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->LeaveGroup(g_state.realm_id, playerGUID) ? 0 : -1;
+}
+
 TC9_API void TC9PlayerLeftBattleground(
     uint64_t playerGUID,
     uint32_t realmID,
