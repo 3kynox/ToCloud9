@@ -49,8 +49,8 @@ struct TC9State {
     tc9::CppBindings bindings;
 
     bool initialized = false;
-    std::string assigned_server_id;
     uint32_t realm_id = 0;
+    std::string assigned_server_id;
 };
 
 TC9State g_state;
@@ -140,15 +140,17 @@ TC9_API void TC9InitLib(
             config.servers_registry_address(),
             config.guid_provider_address(),
             config.matchmaking_address(),
-            config.group_service_address()
+            config.group_service_address(),
+            config.guild_service_address()
         );
+
+        g_state.realm_id = realmID;
 
         // Start NATS consumer
         g_state.nats_consumer->SetEventQueue(g_state.event_queue.get());
         g_state.nats_consumer->SetRealmID(realmID);
         g_state.nats_consumer->Start();
         g_state.nats_publisher->Start();
-        g_state.realm_id = realmID;
 
         // Start gRPC server
         g_state.grpc_manager->Start();
@@ -487,6 +489,20 @@ TC9_API int TC9GroupLeave(uint64_t playerGUID) {
     }
 
     return g_state.grpc_clients->LeaveGroup(g_state.realm_id, playerGUID) ? 0 : -1;
+}
+
+TC9_API int TC9GuildCreate(uint64_t leaderGUID, const char* name, uint64_t* guildID) {
+    if (!g_state.initialized || !g_state.grpc_clients || !name || !guildID) {
+        return -1;
+    }
+
+    uint64_t created_guild_id = 0;
+    if (!g_state.grpc_clients->CreateGuild(g_state.realm_id, leaderGUID, name, created_guild_id)) {
+        return -1;
+    }
+
+    *guildID = created_guild_id;
+    return 0;
 }
 
 TC9_API void TC9PlayerLeftBattleground(

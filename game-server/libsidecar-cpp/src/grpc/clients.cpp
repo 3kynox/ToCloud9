@@ -3,6 +3,7 @@
 #include "guid/guid.grpc.pb.h"
 #include "matchmaking/matchmaking.grpc.pb.h"
 #include "group/group.grpc.pb.h"
+#include "guilds/guilds.grpc.pb.h"
 #include <spdlog/spdlog.h>
 
 namespace tc9 {
@@ -22,7 +23,8 @@ GrpcClients::~GrpcClients() {
 void GrpcClients::Connect(const std::string& registry_addr,
                           const std::string& guid_addr,
                           const std::string& matchmaking_addr,
-                          const std::string& group_addr) {
+                          const std::string& group_addr,
+                          const std::string& guild_addr) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     spdlog::info("Connecting to gRPC services:");
@@ -30,6 +32,7 @@ void GrpcClients::Connect(const std::string& registry_addr,
     spdlog::info("  - GUID: {}", guid_addr);
     spdlog::info("  - Matchmaking: {}", matchmaking_addr);
     spdlog::info("  - Group: {}", group_addr);
+    spdlog::info("  - Guild: {}", guild_addr);
 
     // Create channels (using insecure credentials for now)
     registry_channel_ = grpc::CreateChannel(
@@ -40,12 +43,15 @@ void GrpcClients::Connect(const std::string& registry_addr,
         matchmaking_addr, grpc::InsecureChannelCredentials());
     group_channel_ = grpc::CreateChannel(
         group_addr, grpc::InsecureChannelCredentials());
+    guild_channel_ = grpc::CreateChannel(
+        guild_addr, grpc::InsecureChannelCredentials());
 
     // Create stubs
     registry_stub_ = v1::ServersRegistryService::NewStub(registry_channel_);
     guid_stub_ = v1::GuidService::NewStub(guid_channel_);
     matchmaking_stub_ = v1::MatchmakingService::NewStub(matchmaking_channel_);
     group_stub_ = v1::GroupService::NewStub(group_channel_);
+    guild_stub_ = v1::GuildService::NewStub(guild_channel_);
 
     connected_ = true;
     spdlog::info("✅ All gRPC clients connected");
@@ -120,11 +126,13 @@ void GrpcClients::Shutdown() {
     guid_stub_.reset();
     matchmaking_stub_.reset();
     group_stub_.reset();
+    guild_stub_.reset();
 
     registry_channel_.reset();
     guid_channel_.reset();
     matchmaking_channel_.reset();
     group_channel_.reset();
+    guild_channel_.reset();
 
     connected_ = false;
 }
@@ -325,6 +333,40 @@ bool GrpcClients::BattlegroundStatusChanged(
 
     spdlog::debug("Notified matchmaking: BG instance {} status changed to {}",
                  instance_id, status);
+    return true;
+}
+
+bool GrpcClients::CreateGuild(
+    uint32_t realm_id,
+    uint64_t leader_guid,
+    const std::string& name,
+    uint64_t& out_guild_id) {
+
+    if (!connected_ || !guild_stub_) {
+        spdlog::error("Guild client not connected");
+        return false;
+    }
+
+    v1::CreateGuildParams request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_leaderguid(leader_guid);
+    request.set_name(name);
+
+    v1::CreateGuildResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = guild_stub_->CreateGuild(&context, request, &response);
+    if (!status.ok()) {
+        spdlog::error("CreateGuild failed for leader {}: {} - {}",
+                      leader_guid, status.error_code(), status.error_message());
+        return false;
+    }
+
+    out_guild_id = response.guildid();
+    spdlog::info("✅ Guild '{}' created with id {} (leader {})",
+                 name, out_guild_id, leader_guid);
     return true;
 }
 

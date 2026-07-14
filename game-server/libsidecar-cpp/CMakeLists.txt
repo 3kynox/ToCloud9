@@ -282,6 +282,7 @@ set(PROTO_FILES
     "matchmaking/matchmaking.proto"
     "guid/guid.proto"
     "group/group.proto"
+    "guilds/guilds.proto"
 )
 
 set(PROTO_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")

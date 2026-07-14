@@ -10,6 +10,7 @@
 #include "guid/guid.grpc.pb.h"
 #include "matchmaking/matchmaking.grpc.pb.h"
 #include "group/group.grpc.pb.h"
+#include "guilds/guilds.grpc.pb.h"
 
 namespace tc9 {
 
@@ -22,7 +23,8 @@ public:
     void Connect(const std::string& registry_addr,
                  const std::string& guid_addr,
                  const std::string& matchmaking_addr,
-                 const std::string& group_addr);
+                 const std::string& group_addr,
+                 const std::string& guild_addr);
 
     // Servers Registry Client
     bool RegisterGameServer(
@@ -70,6 +72,14 @@ public:
         uint32_t realm_id,
         uint64_t player_guid);
 
+    // Guild Client (guild service owns guild state cluster-wide; in-process
+    // sessions have no gateway, so the worldserver calls it on their behalf)
+    bool CreateGuild(
+        uint32_t realm_id,
+        uint64_t leader_guid,
+        const std::string& name,
+        uint64_t& out_guild_id);
+
     void Shutdown();
 
     GrpcClients(const GrpcClients&) = delete;
@@ -84,12 +94,14 @@ private:
     std::shared_ptr<grpc::Channel> guid_channel_;
     std::shared_ptr<grpc::Channel> matchmaking_channel_;
     std::shared_ptr<grpc::Channel> group_channel_;
+    std::shared_ptr<grpc::Channel> guild_channel_;
 
     // gRPC stubs
     std::unique_ptr<v1::ServersRegistryService::Stub> registry_stub_;
     std::unique_ptr<v1::GuidService::Stub> guid_stub_;
     std::unique_ptr<v1::MatchmakingService::Stub> matchmaking_stub_;
     std::unique_ptr<v1::GroupService::Stub> group_stub_;
+    std::unique_ptr<v1::GuildService::Stub> guild_stub_;
 
     // Helper to create deadline for requests
     std::chrono::system_clock::time_point Deadline(int seconds = 5);
