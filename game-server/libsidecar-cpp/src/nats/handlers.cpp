@@ -14,11 +14,21 @@ namespace {
 
 // Every Go producer wraps events in the EventToSendGenericPayload envelope
 // {"v":version,"t":eventType,"p":payload}; handlers consume the payload.
+// Only unwrap when all envelope markers match ("v" string, "t" integer,
+// "p" object) so payloads that legitimately carry a root-level "p" field
+// are left untouched.
 json ParseEventPayload(const std::string& data) {
     auto j = json::parse(data);
-    auto it = j.find("p");
-    if (it != j.end() && it->is_object()) {
-        return *it;
+    if (!j.is_object()) {
+        return j;
+    }
+    auto v = j.find("v");
+    auto t = j.find("t");
+    auto p = j.find("p");
+    if (v != j.end() && v->is_string() &&
+        t != j.end() && t->is_number_integer() &&
+        p != j.end() && p->is_object()) {
+        return *p;
     }
     return j;
 }
