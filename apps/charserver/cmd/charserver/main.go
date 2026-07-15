@@ -72,6 +72,8 @@ func main() {
 
 	onlineCharsRepo := repo.NewCharactersOnlineInMem()
 
+	guildNames := repo.NewGuildNamesMySQL(charDB)
+
 	// Friends initialization
 	friendsOnlineCache := service.NewOnlinePlayersCache()
 	friendsEventsProducer := events.NewFriendsServiceProducerNatsJSON(nc, charserver.Ver)
@@ -109,7 +111,7 @@ func main() {
 	defer srHandler.Stop()
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterCharactersServiceServer(grpcServer, server.NewCharServer(charRepo, onlineCharsRepo, onlineCharsRepo, itemsTemplate, friendsService))
+	pb.RegisterCharactersServiceServer(grpcServer, server.NewCharServer(charRepo, onlineCharsRepo, onlineCharsRepo, itemsTemplate, friendsService, guildNames))
 
 	log.Info().Str("address", lis.Addr().String()).Msg("🚀 Characters Server Started!")
 

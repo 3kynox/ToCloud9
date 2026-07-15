@@ -22,15 +22,17 @@ type CharServer struct {
 	itemsTemplate  repo.ItemsTemplate
 	onlineChars    repo.CharactersOnline
 	friendsService service.FriendsService
+	guildNames     repo.GuildNameResolver
 }
 
-func NewCharServer(repo repo.Characters, onlineChars repo.CharactersOnline, whoHandler repo.WhoHandler, itemsTemplate repo.ItemsTemplate, friendsService service.FriendsService) pb.CharactersServiceServer {
+func NewCharServer(repo repo.Characters, onlineChars repo.CharactersOnline, whoHandler repo.WhoHandler, itemsTemplate repo.ItemsTemplate, friendsService service.FriendsService, guildNames repo.GuildNameResolver) pb.CharactersServiceServer {
 	return &CharServer{
 		repo:           repo,
 		whoHandler:     whoHandler,
 		itemsTemplate:  itemsTemplate,
 		onlineChars:    onlineChars,
 		friendsService: friendsService,
+		guildNames:     guildNames,
 	}
 }
 
@@ -225,10 +227,21 @@ func (c *CharServer) WhoQuery(ctx context.Context, request *pb.WhoQueryRequest) 
 	}
 	items := make([]*pb.WhoQueryResponse_WhoItem, 0, 50)
 	for i := 0; i < len(chars) && i < 50; i++ {
+		// Guild id is snapshotted at login, a guild joined mid-session shows up after relog.
+		guildName := ""
+		if chars[i].CharGuildID != 0 {
+			name, gErr := c.guildNames.GuildNameByID(ctx, request.RealmID, chars[i].CharGuildID)
+			if gErr != nil {
+				log.Warn().Err(gErr).Uint32("guildID", chars[i].CharGuildID).Msg("can't resolve guild name for who query")
+			} else {
+				guildName = name
+			}
+		}
+
 		items = append(items, &pb.WhoQueryResponse_WhoItem{
 			Guid:   chars[i].CharGUID,
 			Name:   chars[i].CharName,
-			Guild:  "", // TODO: add guilds support.
+			Guild:  guildName,
 			Lvl:    uint32(chars[i].CharLevel),
 			Class:  uint32(chars[i].CharClass),
 			Race:   uint32(chars[i].CharRace),
@@ -581,8 +594,8 @@ func (c *CharServer) GetOnlineCharacters(ctx context.Context, request *pb.GetOnl
 	}
 
 	return &pb.GetOnlineCharactersResponse{
-		Api:             ver,
-		CharacterGUIDs:  guids,
-		TotalCount:      uint32(len(guids)),
+		Api:            ver,
+		CharacterGUIDs: guids,
+		TotalCount:     uint32(len(guids)),
 	}, nil
 }
