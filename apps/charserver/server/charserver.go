@@ -226,15 +226,20 @@ func (c *CharServer) WhoQuery(ctx context.Context, request *pb.WhoQueryRequest) 
 		return nil, err
 	}
 	items := make([]*pb.WhoQueryResponse_WhoItem, 0, 50)
+	// Memoize resolved names so characters sharing a guild in the same response
+	// don't repeat the resolver lookup (the realm is fixed for the request).
+	guildNameByID := make(map[uint32]string)
 	for i := 0; i < len(chars) && i < 50; i++ {
 		// Guild id is snapshotted at login, a guild joined mid-session shows up after relog.
 		guildName := ""
-		if chars[i].CharGuildID != 0 {
-			name, gErr := c.guildNames.GuildNameByID(ctx, request.RealmID, chars[i].CharGuildID)
-			if gErr != nil {
-				log.Warn().Err(gErr).Uint32("guildID", chars[i].CharGuildID).Msg("can't resolve guild name for who query")
+		if gid := chars[i].CharGuildID; gid != 0 {
+			if name, ok := guildNameByID[gid]; ok {
+				guildName = name
+			} else if name, gErr := c.guildNames.GuildNameByID(ctx, request.RealmID, gid); gErr != nil {
+				log.Warn().Err(gErr).Uint32("guildID", gid).Msg("can't resolve guild name for who query")
 			} else {
 				guildName = name
+				guildNameByID[gid] = name
 			}
 		}
 
