@@ -158,18 +158,39 @@ func (s *GameSession) guildMemberGUIDByName(ctx context.Context, name string) (u
 	return 0, nil
 }
 
+// GUILD_COMMAND_INVITE result codes carried by SMSG_GUILD_COMMAND_RESULT. The
+// client localizes the displayed message from these codes, so no server-side
+// translation is needed.
+const (
+	guildCommandInvite      = 1  // GUILD_COMMAND_INVITE
+	guildErrCommandSuccess  = 0  // ERR_GUILD_COMMAND_SUCCESS
+	guildErrPlayerNotFoundS = 11 // ERR_GUILD_PLAYER_NOT_FOUND_S
+)
+
+// sendGuildCommandResult sends SMSG_GUILD_COMMAND_RESULT so the client renders
+// the localized guild feedback (e.g. "You have invited X into your guild").
+func (s *GameSession) sendGuildCommandResult(command uint32, param string, result uint32) {
+	w := packet.NewWriterWithSize(packet.SMsgGuildCommandResult, 0)
+	w.Uint32(command)
+	w.String(param)
+	w.Uint32(result)
+	s.gameSocket.Send(w)
+}
+
 func (s *GameSession) HandleGuildInvite(ctx context.Context, p *packet.Packet) error {
+	inviteeName := p.Reader().String()
+
 	resp, err := s.charServiceClient.CharacterOnlineByName(ctx, &pbChar.CharacterOnlineByNameRequest{
 		Api:           root.Ver,
 		RealmID:       root.RealmID,
-		CharacterName: p.Reader().String(),
+		CharacterName: inviteeName,
 	})
 	if err != nil {
 		return err
 	}
 
 	if resp.Character == nil {
-		s.SendSysMessage("Player not found")
+		s.sendGuildCommandResult(guildCommandInvite, inviteeName, guildErrPlayerNotFoundS)
 		return nil
 	}
 
@@ -182,6 +203,11 @@ func (s *GameSession) HandleGuildInvite(ctx context.Context, p *packet.Packet) e
 		Invitee:     resp.Character.CharGUID,
 		InviteeName: resp.Character.CharName,
 	})
+	if err != nil {
+		return fmt.Errorf("can't invite member to guild: %w", err)
+	}
+
+	s.sendGuildCommandResult(guildCommandInvite, resp.Character.CharName, guildErrCommandSuccess)
 
 	return nil
 }

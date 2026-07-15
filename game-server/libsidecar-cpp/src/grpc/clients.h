@@ -80,6 +80,17 @@ public:
         const std::string& name,
         uint64_t& out_guild_id);
 
+    bool AcceptGuildInvite(
+        uint32_t realm_id,
+        uint64_t guid,
+        const std::string& name,
+        uint32_t lvl,
+        uint32_t race,
+        uint32_t class_id,
+        uint32_t gender,
+        uint32_t area_id,
+        uint64_t account_id);
+
     void Shutdown();
 
     GrpcClients(const GrpcClients&) = delete;

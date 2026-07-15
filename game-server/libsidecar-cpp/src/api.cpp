@@ -505,6 +505,23 @@ TC9_API int TC9GuildCreate(uint64_t leaderGUID, const char* name, uint64_t* guil
     return 0;
 }
 
+TC9_API int TC9GuildAcceptInvite(
+    uint64_t guid,
+    const char* name,
+    uint32_t lvl,
+    uint32_t race,
+    uint32_t classID,
+    uint32_t gender,
+    uint32_t areaID,
+    uint64_t accountID) {
+    if (!g_state.initialized || !g_state.grpc_clients || !name) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->AcceptGuildInvite(
+        g_state.realm_id, guid, name, lvl, race, classID, gender, areaID, accountID) ? 0 : -1;
+}
+
 TC9_API void TC9PlayerLeftBattleground(
     uint64_t playerGUID,
     uint32_t realmID,

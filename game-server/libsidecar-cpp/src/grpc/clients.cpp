@@ -370,4 +370,48 @@ bool GrpcClients::CreateGuild(
     return true;
 }
 
+bool GrpcClients::AcceptGuildInvite(
+    uint32_t realm_id,
+    uint64_t guid,
+    const std::string& name,
+    uint32_t lvl,
+    uint32_t race,
+    uint32_t class_id,
+    uint32_t gender,
+    uint32_t area_id,
+    uint64_t account_id) {
+
+    if (!connected_ || !guild_stub_) {
+        spdlog::error("Guild client not connected");
+        return false;
+    }
+
+    v1::InviteAcceptedParams request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+
+    auto* character = request.mutable_character();
+    character->set_guid(guid);
+    character->set_name(name);
+    character->set_lvl(lvl);
+    character->set_race(race);
+    character->set_classid(class_id);
+    character->set_gender(gender);
+    character->set_areaid(area_id);
+    character->set_accountid(account_id);
+
+    v1::InviteAcceptedResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = guild_stub_->InviteAccepted(&context, request, &response);
+    if (!status.ok()) {
+        spdlog::error("AcceptGuildInvite failed for player {}: {} - {}",
+                      guid, status.error_code(), status.error_message());
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace tc9

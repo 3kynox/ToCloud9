@@ -88,6 +88,13 @@ TC9_API int TC9GroupLeave(uint64_t playerGUID);
  * the created guild id in *guildID, -1 on error. */
 TC9_API int TC9GuildCreate(uint64_t leaderGUID, const char* name, uint64_t* guildID);
 
+/* Accept a pending guild invite on behalf of an in-process session (no gateway
+ * to relay SMSG_GUILD_INVITE / CMSG_GUILD_ACCEPT). The guild service records the
+ * member and publishes guild.member.added, which sets the in-process guild id.
+ * Blocking gRPC call, do not call from map update threads. 0 on success, -1 on error. */
+TC9_API int TC9GuildAcceptInvite(uint64_t guid, const char* name, uint32_t lvl,
+    uint32_t race, uint32_t classID, uint32_t gender, uint32_t areaID, uint64_t accountID);
+
 /* Matchmaking notifications */
 TC9_API void TC9PlayerLeftBattleground(uint64_t playerGUID, uint32_t realmID, uint32_t instanceID);
 TC9_API void TC9BattlegroundStatusChanged(uint32_t instanceID, uint8_t status);
