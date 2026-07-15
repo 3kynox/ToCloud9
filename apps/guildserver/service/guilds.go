@@ -250,6 +250,9 @@ func (g *guildServiceImpl) Leave(ctx context.Context, realmID uint32, charGUID u
 	}
 
 	rank := g.rankForMember(guild, charGUID)
+	if rank == nil {
+		return ErrGuildNotFound
+	}
 	if rank.Rank == uint8(repo.GuildRankGuildMaster) {
 		return ErrLeaderCantLeave
 	}
@@ -299,6 +302,9 @@ func (g *guildServiceImpl) Kick(ctx context.Context, realmID uint32, kicker, tar
 	rankOfTarget := g.rankForMember(guild, target)
 	kickerMember := g.guildMemberForMemberGuid(guild, kicker)
 	targetMember := g.guildMemberForMemberGuid(guild, target)
+	if rankOfKicker == nil || rankOfTarget == nil || kickerMember == nil || targetMember == nil {
+		return ErrGuildNotFound
+	}
 
 	if !rankOfKicker.HasRight(repo.RightRemove) {
 		return ErrNotEnoughRight
@@ -341,7 +347,7 @@ func (g *guildServiceImpl) SetMessageOfTheDay(ctx context.Context, realmID uint3
 	}
 
 	rank := g.rankForMember(guild, updaterGUID)
-	if !rank.HasRight(repo.RightSetMessageOfTheDay) {
+	if rank == nil || !rank.HasRight(repo.RightSetMessageOfTheDay) {
 		return ErrNotEnoughRight
 	}
 
@@ -373,7 +379,7 @@ func (g *guildServiceImpl) SetGuildInfo(ctx context.Context, realmID uint32, upd
 	}
 
 	rank := g.rankForMember(guild, updaterGUID)
-	if !rank.HasRight(repo.RightModifyGuildInfo) {
+	if rank == nil || !rank.HasRight(repo.RightModifyGuildInfo) {
 		return ErrNotEnoughRight
 	}
 
@@ -423,7 +429,7 @@ func (g *guildServiceImpl) SetMemberPublicNote(ctx context.Context, realmID uint
 	}
 
 	rank := g.rankForMember(guild, updaterGUID)
-	if !rank.HasRight(repo.RightEditPublicNote) {
+	if rank == nil || !rank.HasRight(repo.RightEditPublicNote) {
 		return ErrNotEnoughRight
 	}
 
@@ -479,8 +485,8 @@ func (g *guildServiceImpl) SetMemberOfficerNote(ctx context.Context, realmID uin
 		return err
 	}
 
-	rank := g.rankForMember(guild, updaterGuildID)
-	if !rank.HasRight(repo.RightEditOfficersNote) {
+	rank := g.rankForMember(guild, updaterGUID)
+	if rank == nil || !rank.HasRight(repo.RightEditOfficersNote) {
 		return ErrNotEnoughRight
 	}
 
@@ -519,7 +525,7 @@ func (g *guildServiceImpl) UpdateGuildRank(ctx context.Context, realmID uint32, 
 	}
 
 	memberRank := g.rankForMember(guild, updaterGUID)
-	if memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
+	if memberRank == nil || memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
 		return ErrNotEnoughRight
 	}
 
@@ -555,7 +561,7 @@ func (g *guildServiceImpl) AddGuildRank(ctx context.Context, realmID uint32, upd
 	}
 
 	memberRank := g.rankForMember(guild, updaterGUID)
-	if memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
+	if memberRank == nil || memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
 		return ErrNotEnoughRight
 	}
 
@@ -594,7 +600,7 @@ func (g *guildServiceImpl) DeleteLastGuildRank(ctx context.Context, realmID uint
 	}
 
 	memberRank := g.rankForMember(guild, updaterGUID)
-	if memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
+	if memberRank == nil || memberRank.Rank != uint8(repo.GuildRankGuildMaster) {
 		return ErrNotEnoughRight
 	}
 
@@ -696,6 +702,9 @@ func (g *guildServiceImpl) updateRank(ctx context.Context, realmID uint32, updat
 	}
 
 	rank := g.rankForMember(guild, updaterGUID)
+	if rank == nil {
+		return ErrGuildNotFound
+	}
 	if promote && !rank.HasRight(repo.RightPromote) {
 		return ErrNotEnoughRight
 	} else if !promote && !rank.HasRight(repo.RightDemote) {
@@ -703,6 +712,9 @@ func (g *guildServiceImpl) updateRank(ctx context.Context, realmID uint32, updat
 	}
 
 	targetRank := g.rankForMember(guild, targetGUID)
+	if targetRank == nil {
+		return ErrGuildNotFound
+	}
 	var newRank uint8
 	if promote {
 		newRank = targetRank.Rank - 1
@@ -724,6 +736,9 @@ func (g *guildServiceImpl) updateRank(ctx context.Context, realmID uint32, updat
 	newRankObj := g.rankWithID(guild, newRank)
 	updater := g.guildMemberForMemberGuid(guild, updaterGUID)
 	target := g.guildMemberForMemberGuid(guild, targetGUID)
+	if newRankObj == nil || updater == nil || target == nil {
+		return ErrGuildNotFound
+	}
 
 	err = g.guildsRepo.SetMemberRank(ctx, realmID, targetGUID, newRank)
 	if err != nil {
