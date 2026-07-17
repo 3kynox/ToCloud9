@@ -158,12 +158,15 @@ func (s *GameSession) guildMemberGUIDByName(ctx context.Context, name string) (u
 	return 0, nil
 }
 
-// GUILD_COMMAND_INVITE result codes carried by SMSG_GUILD_COMMAND_RESULT. The
+// Guild command and result codes carried by SMSG_GUILD_COMMAND_RESULT. The
 // client localizes the displayed message from these codes, so no server-side
 // translation is needed.
 const (
+	guildCommandCreate      = 0  // GUILD_COMMAND_CREATE
 	guildCommandInvite      = 1  // GUILD_COMMAND_INVITE
 	guildErrCommandSuccess  = 0  // ERR_GUILD_COMMAND_SUCCESS
+	guildErrNameInvalid     = 6  // ERR_GUILD_NAME_INVALID
+	guildErrNameExistsS     = 7  // ERR_GUILD_NAME_EXISTS_S
 	guildErrPlayerNotFoundS = 11 // ERR_GUILD_PLAYER_NOT_FOUND_S
 )
 
@@ -256,6 +259,18 @@ func (s *GameSession) HandleEventGuildMOTDUpdated(_ context.Context, e *eBroadca
 		GuildEventTypeMessageOfTheDay, 0,
 		eventData.NewMessageOfTheDay,
 	))
+
+	return nil
+}
+
+// HandleEventGuildCreated links the session to the freshly created guild so
+// gateway-side guild features (roster, permissions) work for the petition
+// signatories without a relog. The leader's session is updated synchronously in
+// HandleTurnInPetition; for it this event is a no-op.
+func (s *GameSession) HandleEventGuildCreated(_ context.Context, e *eBroadcaster.Event) error {
+	eventData := e.Payload.(*events.GuildEventGuildCreatedPayload)
+
+	s.character.GuildID = uint32(eventData.GuildID)
 
 	return nil
 }
