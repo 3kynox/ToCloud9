@@ -124,6 +124,12 @@ func createGuildService(cfg *config.Config, natsCon *nats.Conn) service.GuildSer
 		log.Fatal().Err(err).Msg("can't warmup guilds cache")
 	}
 
+	charsListener := service.NewCharactersListener(natsCon, cache)
+	err = charsListener.Listen()
+	if err != nil {
+		log.Fatal().Err(err).Msg("can't listen to characters service events")
+	}
+
 	seedOnlineChars(cfg, cache, 1)
 
 	return service.NewGuildService(cache, events.NewGuildServiceProducerNatsJSON(natsCon, guildserver.Ver))
