@@ -255,6 +255,10 @@ func (s *GameSession) HandleEventGuildMemberPromoted(ctx context.Context, e *eBr
 		eventData.RankName,
 	))
 
+	if eventData.MemberGUID == s.character.GUID {
+		return s.sendGuildPermissions(ctx)
+	}
+
 	return nil
 }
 
@@ -267,6 +271,10 @@ func (s *GameSession) HandleEventGuildMemberDemoted(ctx context.Context, e *eBro
 		eventData.MemberName,
 		eventData.RankName,
 	))
+
+	if eventData.MemberGUID == s.character.GUID {
+		return s.sendGuildPermissions(ctx)
+	}
 
 	return nil
 }
@@ -668,6 +676,15 @@ func (s *GameSession) HandleGuildQuery(ctx context.Context, p *packet.Packet) er
 }
 
 func (s *GameSession) HandleGuildPermissions(ctx context.Context, p *packet.Packet) error {
+	return s.sendGuildPermissions(ctx)
+}
+
+// sendGuildPermissions pushes the MSG_GUILD_PERMISSIONS response with the
+// member's current rank rights. Besides answering the client query, it is
+// pushed unsolicited after a promotion/demotion since the client doesn't
+// re-query permissions on its own (same trick as the core SendPermissions
+// call on guild bank tab purchase).
+func (s *GameSession) sendGuildPermissions(ctx context.Context) error {
 	if s.character.GuildID == 0 {
 		// TODO: send proper message to the client
 		return nil
