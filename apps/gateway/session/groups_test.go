@@ -123,8 +123,8 @@ func TestHandleRequestPartyMemberStatsCacheMissKnownMember(t *testing.T) {
 			Api: root.SupportedGroupServiceVer,
 			Group: &pbGroup.GetGroupResponse_Group{
 				Members: []*pbGroup.GetGroupResponse_GroupMember{
-					{Guid: 42},
-					{Guid: memberGUID},
+					{Guid: 42, IsOnline: true},
+					{Guid: memberGUID, IsOnline: true},
 				},
 			},
 		},
@@ -138,6 +138,35 @@ func TestHandleRequestPartyMemberStatsCacheMissKnownMember(t *testing.T) {
 	assert.Equal(t, 1, groupClient.calls)
 	if assert.Len(t, *sentToClient, 1) {
 		assert.Equal(t, packet.SMsgPartyMemberStats, (*sentToClient)[0].Opcode)
+	}
+}
+
+func TestHandleRequestPartyMemberStatsCacheMissOfflineMemberFallsThrough(t *testing.T) {
+	// A group member that is not connected must keep the game server "offline"
+	// stub path: answering with a fabricated status would show a disconnected
+	// member as online with a full health bar.
+	const memberGUID = uint64(60553)
+	groupClient := &groupServiceClientByMemberMock{
+		resp: &pbGroup.GetGroupResponse{
+			Api: root.SupportedGroupServiceVer,
+			Group: &pbGroup.GetGroupResponse_Group{
+				Members: []*pbGroup.GetGroupResponse_GroupMember{
+					{Guid: 42, IsOnline: true},
+					{Guid: memberGUID, IsOnline: false},
+				},
+			},
+		},
+	}
+	session, sentToClient, forwardedToWorld := partyMemberStatsSession(t, groupClient)
+
+	p := requestPartyMemberStatsPacket(memberGUID)
+	err := session.HandleRequestPartyMemberStats(context.Background(), p)
+	assert.Nil(t, err)
+
+	assert.Empty(t, *sentToClient)
+	assert.Equal(t, 1, groupClient.calls)
+	if assert.Len(t, *forwardedToWorld, 1) {
+		assert.Equal(t, p, (*forwardedToWorld)[0])
 	}
 }
 

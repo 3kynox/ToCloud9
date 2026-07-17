@@ -692,8 +692,11 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 		// and only ever receives changed fields, so a miss doesn't mean "not a
 		// member". Confirm with the group service before falling through: the
 		// game server would answer with an "offline" stub for a live member.
-		// Pets and other non-player GUIDs (high type bits set) do fall through.
-		if guid>>48 == 0 && s.isInPlayersGroup(ctx, guid) {
+		// Offline members do fall through — for them the "offline" stub is the
+		// right answer, while a fabricated status would show a disconnected
+		// member as online with a full health bar. Pets and other non-player
+		// GUIDs (high type bits set) fall through too.
+		if guid>>48 == 0 && s.isOnlineInPlayersGroup(ctx, guid) {
 			s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&events.GroupMemberStatsUpdate{MemberGUID: guid}))
 			return nil
 		}
@@ -721,9 +724,9 @@ func groupMemberStatsComplete(stats *events.GroupMemberStatsUpdate) bool {
 		stats.CurPower != nil && stats.MaxPower != nil && stats.Level != nil && stats.Zone != nil
 }
 
-// isInPlayersGroup reports whether the given GUID belongs to the same group as
-// the session's character.
-func (s *GameSession) isInPlayersGroup(ctx context.Context, guid uint64) bool {
+// isOnlineInPlayersGroup reports whether the given GUID belongs to the same group
+// as the session's character and that member is currently online.
+func (s *GameSession) isOnlineInPlayersGroup(ctx context.Context, guid uint64) bool {
 	gr, err := s.groupServiceClient.GetGroupByMember(ctx, &pb.GetGroupByMemberRequest{
 		Api:     root.SupportedGroupServiceVer,
 		RealmID: root.RealmID,
@@ -735,7 +738,7 @@ func (s *GameSession) isInPlayersGroup(ctx context.Context, guid uint64) bool {
 
 	for _, member := range gr.Group.Members {
 		if member.Guid == guid {
-			return true
+			return member.IsOnline
 		}
 	}
 
