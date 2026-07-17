@@ -688,13 +688,58 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 
 	stats, found := s.groupMemberStats[guid]
 	if !found {
-		// Not a tracked group member (e.g. pet) — let the game server answer.
+		// The cache starts empty (fresh login or post-redirect session rebuild)
+		// and only ever receives changed fields, so a miss doesn't mean "not a
+		// member". Confirm with the group service before falling through: the
+		// game server would answer with an "offline" stub for a live member.
+		// Pets and other non-player GUIDs (high type bits set) do fall through.
+		if guid>>48 == 0 && s.isInPlayersGroup(ctx, guid) {
+			s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&events.GroupMemberStatsUpdate{MemberGUID: guid}))
+			return nil
+		}
+
 		s.worldSocket.SendPacket(p)
 		return nil
 	}
 
-	s.gameSocket.SendPacket(buildPartyMemberStatsFullPacket(guid, &stats))
+	// A FULL response resets every field its mask doesn't carry, and the cache
+	// only holds fields that changed since it was created (a member whose HP
+	// never changed has no HP there): an incomplete FULL zeroes health client
+	// side, showing the member as dead. Answer incrementally unless every field
+	// is known — the client then keeps its last known values.
+	if groupMemberStatsComplete(&stats) {
+		s.gameSocket.SendPacket(buildPartyMemberStatsFullPacket(guid, &stats))
+	} else {
+		s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&stats))
+	}
+
 	return nil
+}
+
+func groupMemberStatsComplete(stats *events.GroupMemberStatsUpdate) bool {
+	return stats.CurHP != nil && stats.MaxHP != nil && stats.PowerType != nil &&
+		stats.CurPower != nil && stats.MaxPower != nil && stats.Level != nil && stats.Zone != nil
+}
+
+// isInPlayersGroup reports whether the given GUID belongs to the same group as
+// the session's character.
+func (s *GameSession) isInPlayersGroup(ctx context.Context, guid uint64) bool {
+	gr, err := s.groupServiceClient.GetGroupByMember(ctx, &pb.GetGroupByMemberRequest{
+		Api:     root.SupportedGroupServiceVer,
+		RealmID: root.RealmID,
+		Player:  s.character.GUID,
+	})
+	if err != nil || gr.Group == nil {
+		return false
+	}
+
+	for _, member := range gr.Group.Members {
+		if member.Guid == guid {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *GameSession) storeGroupMemberStats(upd *events.GroupMemberStatsUpdate) {
