@@ -318,7 +318,7 @@ func Test_guildsInMemCache_CreateGuildMarksLeaderOnline(t *testing.T) {
 	)
 
 	repoMock := &mocks.GuildsRepo{}
-	repoMock.On("CreateGuild", mock.Anything, realmID, "Moebius", leaderGUID, mock.Anything).Return(guildID, nil)
+	repoMock.On("CreateGuild", mock.Anything, realmID, "Moebius", leaderGUID, mock.Anything, mock.Anything).Return(guildID, nil)
 	repoMock.On("GuildByRealmAndID", mock.Anything, realmID, guildID).Return(&repo.Guild{
 		ID: guildID,
 		GuildMembers: []*repo.GuildMember{
@@ -330,7 +330,7 @@ func Test_guildsInMemCache_CreateGuildMarksLeaderOnline(t *testing.T) {
 	cache.cache = map[uint32]map[uint64]*repo.Guild{realmID: {}}
 	cache.guildMembersCache = map[uint32]map[uint64]*repo.GuildMember{realmID: {}}
 
-	id, err := cache.CreateGuild(context.Background(), realmID, "Moebius", leaderGUID, nil)
+	id, err := cache.CreateGuild(context.Background(), realmID, "Moebius", leaderGUID, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, guildID, id)
 	assert.Equal(t, repo.GuildMemberStatusOnline, cache.guildMembersCache[realmID][leaderGUID].Status)
@@ -344,7 +344,7 @@ func Test_guildsInMemCache_CreateGuildLeaderStaysOnlineAcrossRefresh(t *testing.
 	)
 
 	repoMock := &mocks.GuildsRepo{}
-	repoMock.On("CreateGuild", mock.Anything, realmID, "Moebius", leaderGUID, mock.Anything).Return(guildID, nil)
+	repoMock.On("CreateGuild", mock.Anything, realmID, "Moebius", leaderGUID, mock.Anything, mock.Anything).Return(guildID, nil)
 	// Both the create hydration and the later refresh read the leader as
 	// offline: in cluster mode the world doesn't flush characters.online.
 	repoMock.On("GuildByRealmAndID", mock.Anything, realmID, guildID).Return(&repo.Guild{
@@ -358,7 +358,7 @@ func Test_guildsInMemCache_CreateGuildLeaderStaysOnlineAcrossRefresh(t *testing.
 	cache.cache = map[uint32]map[uint64]*repo.Guild{realmID: {}}
 	cache.guildMembersCache = map[uint32]map[uint64]*repo.GuildMember{realmID: {}}
 
-	_, err := cache.CreateGuild(context.Background(), realmID, "Moebius", leaderGUID, nil)
+	_, err := cache.CreateGuild(context.Background(), realmID, "Moebius", leaderGUID, nil, nil)
 	assert.NoError(t, err)
 
 	guild, err := cache.GuildByRealmAndID(context.Background(), realmID, guildID)

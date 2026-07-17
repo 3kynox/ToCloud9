@@ -494,8 +494,8 @@ func applyCharUpdate(member *repo.GuildMember, upd *events.CharacterUpdate) {
 
 // CreateGuild creates the guild in the underlying repo and caches it hydrated
 // (the reload joins member details from the characters table).
-func (g *guildsInMemCache) CreateGuild(ctx context.Context, realmID uint32, name string, leaderGUID uint64, ranks []repo.GuildRank) (uint64, error) {
-	id, err := g.r.CreateGuild(ctx, realmID, name, leaderGUID, ranks)
+func (g *guildsInMemCache) CreateGuild(ctx context.Context, realmID uint32, name string, leaderGUID uint64, ranks []repo.GuildRank, memberGUIDs []uint64) (uint64, error) {
+	id, err := g.r.CreateGuild(ctx, realmID, name, leaderGUID, ranks, memberGUIDs)
 	if err != nil {
 		return 0, err
 	}
