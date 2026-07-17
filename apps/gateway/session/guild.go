@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	root "github.com/walkline/ToCloud9/apps/gateway"
 	eBroadcaster "github.com/walkline/ToCloud9/apps/gateway/events-broadcaster"
 	"github.com/walkline/ToCloud9/apps/gateway/packet"
@@ -162,12 +165,15 @@ func (s *GameSession) guildMemberGUIDByName(ctx context.Context, name string) (u
 // client localizes the displayed message from these codes, so no server-side
 // translation is needed.
 const (
-	guildCommandCreate      = 0  // GUILD_COMMAND_CREATE
-	guildCommandInvite      = 1  // GUILD_COMMAND_INVITE
-	guildErrCommandSuccess  = 0  // ERR_GUILD_COMMAND_SUCCESS
-	guildErrNameInvalid     = 6  // ERR_GUILD_NAME_INVALID
-	guildErrNameExistsS     = 7  // ERR_GUILD_NAME_EXISTS_S
-	guildErrPlayerNotFoundS = 11 // ERR_GUILD_PLAYER_NOT_FOUND_S
+	guildCommandCreate       = 0  // GUILD_COMMAND_CREATE
+	guildCommandInvite       = 1  // GUILD_COMMAND_INVITE
+	guildErrCommandSuccess   = 0  // ERR_GUILD_COMMAND_SUCCESS
+	guildErrAlreadyInGuildS  = 3  // ERR_ALREADY_IN_GUILD_S
+	guildErrNameInvalid      = 6  // ERR_GUILD_NAME_INVALID
+	guildErrNameExistsS      = 7  // ERR_GUILD_NAME_EXISTS_S
+	guildErrPermissions      = 8  // ERR_GUILD_PERMISSIONS
+	guildErrPlayerNotInGuild = 9  // ERR_GUILD_PLAYER_NOT_IN_GUILD
+	guildErrPlayerNotFoundS  = 11 // ERR_GUILD_PLAYER_NOT_FOUND_S
 )
 
 // sendGuildCommandResult sends SMSG_GUILD_COMMAND_RESULT so the client renders
@@ -207,6 +213,19 @@ func (s *GameSession) HandleGuildInvite(ctx context.Context, p *packet.Packet) e
 		InviteeName: resp.Character.CharName,
 	})
 	if err != nil {
+		// Business failures come back as gRPC status codes (see guildserver
+		// server layer); surface them to the client instead of a silent log.
+		switch status.Code(err) {
+		case codes.FailedPrecondition:
+			s.sendGuildCommandResult(guildCommandInvite, resp.Character.CharName, guildErrAlreadyInGuildS)
+			return nil
+		case codes.PermissionDenied:
+			s.sendGuildCommandResult(guildCommandInvite, "", guildErrPermissions)
+			return nil
+		case codes.NotFound:
+			s.sendGuildCommandResult(guildCommandInvite, "", guildErrPlayerNotInGuild)
+			return nil
+		}
 		return fmt.Errorf("can't invite member to guild: %w", err)
 	}
 

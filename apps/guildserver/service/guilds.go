@@ -137,7 +137,7 @@ func (g *guildServiceImpl) InviteMember(ctx context.Context, realmID uint32, inv
 	}
 
 	if inviteeGuildID != 0 {
-		return errors.New("invitee already in guild")
+		return ErrAlreadyInGuild
 	}
 
 	guild, err := g.guildsRepo.GuildByRealmAndID(ctx, realmID, guildID)
