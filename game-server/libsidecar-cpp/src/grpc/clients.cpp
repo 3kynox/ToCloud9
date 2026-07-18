@@ -344,6 +344,43 @@ bool GrpcClients::BattlegroundQueueDataForPlayer(
     return true;
 }
 
+bool GrpcClients::EnqueueToBattleground(
+    uint32_t realm_id,
+    uint64_t player_guid,
+    uint32_t player_lvl,
+    uint32_t bg_type_id,
+    uint32_t team_id) {
+
+    if (!connected_ || !matchmaking_stub_) {
+        spdlog::error("Matchmaking client not connected");
+        return false;
+    }
+
+    v1::EnqueueToBattlegroundRequest request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_leaderguid(player_guid);
+    request.set_leaderslvl(player_lvl);
+    request.set_bgtypeid(bg_type_id);
+    request.set_teamid(static_cast<v1::PVPTeamID>(team_id));
+
+    v1::EnqueueToBattlegroundResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = matchmaking_stub_->EnqueueToBattleground(&context, request, &response);
+
+    if (!status.ok()) {
+        spdlog::warn("EnqueueToBattleground RPC failed: {} - {}",
+                    status.error_code(), status.error_message());
+        return false;
+    }
+
+    spdlog::debug("Enqueued player {} to BG type {} (team {})",
+                 player_guid, bg_type_id, team_id);
+    return true;
+}
+
 bool GrpcClients::PlayerJoinedBattleground(
     uint32_t realm_id,
     uint64_t player_guid,

@@ -589,6 +589,20 @@ TC9_API int TC9PlayerJoinedBattleground(uint64_t playerGUID, uint32_t instanceID
         g_state.realm_id, playerGUID, instanceID, false) ? 0 : -1;
 }
 
+TC9_API int TC9EnqueueLocalPlayerToBattleground(
+    uint64_t playerGUID,
+    uint32_t playerLvl,
+    uint32_t bgTypeID,
+    uint32_t pvpTeamID) {
+
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->EnqueueToBattleground(
+        g_state.realm_id, playerGUID, playerLvl, bgTypeID, pvpTeamID) ? 0 : -1;
+}
+
 TC9_API void TC9BattlegroundStatusChanged(uint32_t instanceID, uint8_t status) {
     if (!g_state.initialized) {
         return;

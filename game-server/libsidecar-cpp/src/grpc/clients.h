@@ -72,6 +72,15 @@ public:
         uint32_t instance_id,
         bool is_cross_realm);
 
+    // Enqueues a solo in-process player into a battleground queue, the same
+    // RPC the gateway issues for real players (team_id: 1 alliance, 2 horde).
+    bool EnqueueToBattleground(
+        uint32_t realm_id,
+        uint64_t player_guid,
+        uint32_t player_lvl,
+        uint32_t bg_type_id,
+        uint32_t team_id);
+
     // Resolves a game server's public address (host:port) from its registry
     // ID. Used to decide whether an assigned battleground is served by this
     // very worldserver.
