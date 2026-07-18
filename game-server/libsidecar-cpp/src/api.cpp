@@ -538,6 +538,57 @@ TC9_API void TC9PlayerLeftBattleground(
     }
 }
 
+TC9_API int TC9BattlegroundQueueDataForLocalPlayer(
+    uint64_t playerGUID,
+    uint32_t* outBgTypeID,
+    uint32_t* outInstanceID,
+    uint32_t* outMapID,
+    int* outIsAssignedToThisServer) {
+
+    if (!g_state.initialized || !g_state.grpc_clients ||
+        !outBgTypeID || !outInstanceID || !outMapID || !outIsAssignedToThisServer) {
+        return -1;
+    }
+
+    uint32_t bg_type_id = 0;
+    uint32_t instance_id = 0;
+    uint32_t map_id = 0;
+    std::string gameserver_address;
+    if (!g_state.grpc_clients->BattlegroundQueueDataForPlayer(
+            g_state.realm_id, playerGUID, bg_type_id, instance_id, map_id, gameserver_address)) {
+        return -1;
+    }
+
+    // The registry never returns our own ID with a different address, so a
+    // one-shot resolution is enough for the pod's lifetime.
+    static std::mutex own_address_mutex;
+    static std::string own_address;
+    {
+        std::lock_guard<std::mutex> lock(own_address_mutex);
+        if (own_address.empty() &&
+            !g_state.grpc_clients->FindGameServerAddressByID(g_state.assigned_server_id, own_address)) {
+            spdlog::warn("Can't resolve own game server address (id {})", g_state.assigned_server_id);
+            return -1;
+        }
+
+        *outIsAssignedToThisServer = (gameserver_address == own_address) ? 1 : 0;
+    }
+
+    *outBgTypeID = bg_type_id;
+    *outInstanceID = instance_id;
+    *outMapID = map_id;
+    return 0;
+}
+
+TC9_API int TC9PlayerJoinedBattleground(uint64_t playerGUID, uint32_t instanceID) {
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->PlayerJoinedBattleground(
+        g_state.realm_id, playerGUID, instanceID, false) ? 0 : -1;
+}
+
 TC9_API void TC9BattlegroundStatusChanged(uint32_t instanceID, uint8_t status) {
     if (!g_state.initialized) {
         return;

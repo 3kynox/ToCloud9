@@ -56,6 +56,29 @@ public:
         uint32_t instance_id,
         bool is_cross_realm);
 
+    // Sync query of the player's queue slot after an invite; false when the
+    // RPC fails or no battleground has been assigned to the player yet.
+    bool BattlegroundQueueDataForPlayer(
+        uint32_t realm_id,
+        uint64_t player_guid,
+        uint32_t& out_bg_type_id,
+        uint32_t& out_instance_id,
+        uint32_t& out_map_id,
+        std::string& out_gameserver_address);
+
+    bool PlayerJoinedBattleground(
+        uint32_t realm_id,
+        uint64_t player_guid,
+        uint32_t instance_id,
+        bool is_cross_realm);
+
+    // Resolves a game server's public address (host:port) from its registry
+    // ID. Used to decide whether an assigned battleground is served by this
+    // very worldserver.
+    bool FindGameServerAddressByID(
+        const std::string& server_id,
+        std::string& out_address);
+
     bool BattlegroundStatusChanged(
         uint32_t realm_id,
         uint32_t instance_id,
