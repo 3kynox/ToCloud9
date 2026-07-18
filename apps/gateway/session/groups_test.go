@@ -141,6 +141,30 @@ func TestHandleRequestPartyMemberStatsCacheMissKnownMember(t *testing.T) {
 	}
 }
 
+func TestHandleRequestPartyMemberStatsNilWorldSocketDoesNotPanic(t *testing.T) {
+	// Regression: the world connection can be gone while the client keeps
+	// polling member stats (world crash or redirect in flight) — the fall
+	// through used to dereference the nil socket and bring the gateway down.
+	const memberGUID = uint64(60553)
+	groupClient := &groupServiceClientByMemberMock{
+		resp: &pbGroup.GetGroupResponse{
+			Api: root.SupportedGroupServiceVer,
+			Group: &pbGroup.GetGroupResponse_Group{
+				Members: []*pbGroup.GetGroupResponse_GroupMember{
+					{Guid: 42, IsOnline: true},
+					{Guid: memberGUID, IsOnline: false},
+				},
+			},
+		},
+	}
+	session, sentToClient, _ := partyMemberStatsSession(t, groupClient)
+	session.worldSocket = nil
+
+	err := session.HandleRequestPartyMemberStats(context.Background(), requestPartyMemberStatsPacket(memberGUID))
+	assert.Nil(t, err)
+	assert.Empty(t, *sentToClient)
+}
+
 func TestHandleRequestPartyMemberStatsCacheMissOfflineMemberFallsThrough(t *testing.T) {
 	// A group member that is not connected must keep the game server "offline"
 	// stub path: answering with a fabricated status would show a disconnected

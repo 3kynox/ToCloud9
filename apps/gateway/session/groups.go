@@ -336,7 +336,9 @@ func (s *GameSession) HandleSetLootMethod(ctx context.Context, p *packet.Packet)
 
 func (s *GameSession) HandleSetDungeonDifficulty(ctx context.Context, p *packet.Packet) error {
 	if p.Source == packet.SourceWorldServer {
-		s.worldSocket.SendPacket(p)
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
@@ -352,7 +354,9 @@ func (s *GameSession) HandleSetDungeonDifficulty(ctx context.Context, p *packet.
 	}
 
 	if groupResp.Group == nil {
-		s.worldSocket.SendPacket(p)
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
@@ -372,7 +376,9 @@ func (s *GameSession) HandleSetDungeonDifficulty(ctx context.Context, p *packet.
 
 func (s *GameSession) HandleSetRaidDifficulty(ctx context.Context, p *packet.Packet) error {
 	if p.Source == packet.SourceWorldServer {
-		s.worldSocket.SendPacket(p)
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
@@ -388,7 +394,9 @@ func (s *GameSession) HandleSetRaidDifficulty(ctx context.Context, p *packet.Pac
 	}
 
 	if groupResp.Group == nil {
-		s.worldSocket.SendPacket(p)
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
@@ -690,7 +698,9 @@ func (s *GameSession) HandleEventGroupMembersUpdated(ctx context.Context, e *eBr
 // game server responds with an "offline" stub that marks the member as disconnected.
 func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *packet.Packet) error {
 	if s.character == nil || s.character.GroupMangedByGameServer {
-		s.worldSocket.SendPacket(p)
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
@@ -711,7 +721,12 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 			return nil
 		}
 
-		s.worldSocket.SendPacket(p)
+		// The world connection can be gone while the client keeps polling
+		// member stats (world crash or redirect in flight) — drop instead of
+		// dereferencing a nil socket.
+		if s.worldSocket != nil {
+			s.worldSocket.SendPacket(p)
+		}
 		return nil
 	}
 
