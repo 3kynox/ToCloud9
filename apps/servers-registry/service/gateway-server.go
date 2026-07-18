@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"sort"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 
@@ -70,7 +72,23 @@ func NewGateway(
 }
 
 func (b *gatewayImpl) Register(ctx context.Context, server *repo.GatewayServer) (*repo.GatewayServer, error) {
-	err := b.checker.AddHealthCheckObject(server)
+	// A register with a health check address already present in the registry is
+	// a new incarnation of a crashed gateway restarted in place: the health
+	// check kept passing against the replacement process listening on the same
+	// address, so the crash was never observed and its characters never got
+	// disconnected downstream. Retire the stale entry before adding the new one.
+	existing, err := b.r.ListByRealm(ctx, server.RealmID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range existing {
+		if strings.EqualFold(existing[i].HealthCheckAddr, server.HealthCheckAddr) {
+			_ = b.checker.RemoveHealthCheckObject(&existing[i])
+			b.onServerUnhealthy(&existing[i], errors.New("gateway re-registered with the same health check address"))
+		}
+	}
+
+	err = b.checker.AddHealthCheckObject(server)
 	if err != nil {
 		return nil, err
 	}
