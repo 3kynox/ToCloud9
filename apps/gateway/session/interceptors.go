@@ -54,7 +54,7 @@ const powerTypeUnknown = 0xFF
 
 func (s *GameSession) InterceptUpdateObject(ctx context.Context, p *packet.Packet) error {
 	s.gameSocket.SendPacket(p)
-	s.trackCharacterStats(p.Data)
+	s.trackCharacterStats(ctx, p.Data)
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (s *GameSession) InterceptCompressedUpdateObject(ctx context.Context, p *pa
 		return nil
 	}
 
-	s.trackCharacterStats(data)
+	s.trackCharacterStats(ctx, data)
 	return nil
 }
 
@@ -94,11 +94,14 @@ func (s *GameSession) publishCharacterStatsSnapshot() {
 	}
 
 	s.charsUpdsBarrier.UpdateLevel(char.GUID, char.Level)
+	s.charsUpdsBarrier.UpdatePosition(char.GUID, char.PositionX, char.PositionY)
+	s.charsUpdsBarrier.UpdateDeadState(char.GUID, char.IsDead)
+	s.charsUpdsBarrier.UpdateGhostState(char.GUID, char.IsGhost)
 }
 
 // trackCharacterStats extracts stats of the character itself from an SMSG_UPDATE_OBJECT
 // payload and feeds changed values into the characters updates barrier.
-func (s *GameSession) trackCharacterStats(data []byte) {
+func (s *GameSession) trackCharacterStats(ctx context.Context, data []byte) {
 	char := s.character
 	if char == nil {
 		return
@@ -140,6 +143,29 @@ func (s *GameSession) trackCharacterStats(data []byte) {
 	if upd.Level != nil && *upd.Level != 0 && uint8(*upd.Level) != char.Level {
 		char.Level = uint8(*upd.Level)
 		s.charsUpdsBarrier.UpdateLevel(char.GUID, char.Level)
+	}
+
+	if upd.CurHP != nil {
+		if dead := *upd.CurHP == 0; dead != char.IsDead {
+			char.IsDead = dead
+			s.charsUpdsBarrier.UpdateDeadState(char.GUID, dead)
+		}
+	}
+
+	if upd.PlayerFlags != nil {
+		if ghost := *upd.PlayerFlags&packet.PlayerFlagGhost != 0; ghost != char.IsGhost {
+			char.IsGhost = ghost
+			s.charsUpdsBarrier.UpdateGhostState(char.GUID, ghost)
+		}
+	}
+
+	if upd.UnitFlags != nil {
+		if inCombat := *upd.UnitFlags&packet.UnitFlagInCombat != 0; inCombat != char.InCombat {
+			char.InCombat = inCombat
+			if !inCombat {
+				s.resendGroupListAfterCombat(ctx)
+			}
+		}
 	}
 }
 

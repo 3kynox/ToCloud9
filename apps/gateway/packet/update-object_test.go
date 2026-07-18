@@ -193,3 +193,20 @@ func TestDecompressUpdateObject(t *testing.T) {
 	require.NotNil(t, upd.CurHP)
 	assert.Equal(t, uint32(1234), *upd.CurHP)
 }
+
+// TestParseUpdateObjectStatsFlagsFields pins UNIT_FIELD_FLAGS (OBJECT_END+0x35) and
+// PLAYER_FLAGS (UNIT_END+0x2) using literal 3.3.5a indices as an independent oracle.
+func TestParseUpdateObjectStatsFlagsFields(t *testing.T) {
+	data := selfValuesBlockPacket(map[int]uint32{
+		59:  UnitFlagInCombat,
+		150: PlayerFlagGhost,
+	})
+
+	upd, err := ParseUpdateObjectStatsForGUID(data, testCharGUID)
+	require.NoError(t, err)
+
+	require.NotNil(t, upd.UnitFlags)
+	assert.Equal(t, uint32(UnitFlagInCombat), *upd.UnitFlags)
+	require.NotNil(t, upd.PlayerFlags)
+	assert.Equal(t, uint32(PlayerFlagGhost), *upd.PlayerFlags)
+}

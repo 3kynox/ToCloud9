@@ -579,6 +579,10 @@ func (s *GameSession) SendGroupUpdate(ctx context.Context, groupID uint) error {
 
 	s.gameSocket.Send(resp)
 
+	if s.character != nil && s.character.InCombat {
+		s.groupListSentInCombat = true
+	}
+
 	return nil
 }
 
@@ -654,10 +658,15 @@ const (
 	groupUpdateFlagMaxPower  = 0x00000020 // uint16
 	groupUpdateFlagLevel     = 0x00000040 // uint16
 	groupUpdateFlagZone      = 0x00000080 // uint16
+	groupUpdateFlagPosition  = 0x00000100 // uint16, uint16
 )
 
-// memberStatusOnline is the online bit of the member status flags (see AC Group.h GroupMemberOnlineStatus).
-const memberStatusOnline = 0x0001
+// Member status flags (see AC Group.h GroupMemberOnlineStatus).
+const (
+	memberStatusOnline = 0x0001
+	memberStatusDead   = 0x0004
+	memberStatusGhost  = 0x0008
+)
 
 func (s *GameSession) HandleEventGroupMembersUpdated(ctx context.Context, e *eBroadcaster.Event) error {
 	eventData := e.Payload.(*events.GroupEventGroupMembersUpdatedPayload)
@@ -669,7 +678,8 @@ func (s *GameSession) HandleEventGroupMembersUpdated(ctx context.Context, e *eBr
 		}
 
 		s.storeGroupMemberStats(upd)
-		s.gameSocket.SendPacket(buildPartyMemberStatsPacket(upd))
+		merged := s.groupMemberStats[upd.MemberGUID]
+		s.gameSocket.SendPacket(buildPartyMemberStatsPacket(upd, &merged))
 	}
 
 	return nil
@@ -697,7 +707,7 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 		// member as online with a full health bar. Pets and other non-player
 		// GUIDs (high type bits set) fall through too.
 		if guid>>48 == 0 && s.isOnlineInPlayersGroup(ctx, guid) {
-			s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&events.GroupMemberStatsUpdate{MemberGUID: guid}))
+			s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&events.GroupMemberStatsUpdate{MemberGUID: guid}, nil))
 			return nil
 		}
 
@@ -713,7 +723,7 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 	if groupMemberStatsComplete(&stats) {
 		s.gameSocket.SendPacket(buildPartyMemberStatsFullPacket(guid, &stats))
 	} else {
-		s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&stats))
+		s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&stats, &stats))
 	}
 
 	return nil
@@ -745,6 +755,40 @@ func (s *GameSession) isOnlineInPlayersGroup(ctx context.Context, guid uint64) b
 	return false
 }
 
+// resendGroupListAfterCombat is a palliative for clients invited to a group while
+// in combat (BUG-044): the combat lockdown makes the client ignore the group list
+// packet, leaving party frames empty until the next PARTY_MEMBERS_CHANGED. Once
+// combat drops, resend the list and the cached member stats.
+func (s *GameSession) resendGroupListAfterCombat(ctx context.Context) {
+	if !s.groupListSentInCombat {
+		return
+	}
+	s.groupListSentInCombat = false
+
+	if s.character == nil || s.character.GroupMangedByGameServer || len(s.groupMemberStats) == 0 {
+		return
+	}
+
+	groupResp, err := s.groupServiceClient.GetGroupByMember(ctx, &pb.GetGroupByMemberRequest{
+		Api:     root.SupportedGroupServiceVer,
+		RealmID: root.RealmID,
+		Player:  s.character.GUID,
+	})
+	if err != nil || groupResp.Group == nil {
+		return
+	}
+
+	if err = s.SendGroupUpdate(ctx, uint(groupResp.Group.Id)); err != nil {
+		s.logger.Warn().Err(err).Msg("can't resend group list after combat")
+		return
+	}
+
+	for guid, stats := range s.groupMemberStats {
+		stats := stats
+		s.gameSocket.SendPacket(buildPartyMemberStatsFullPacket(guid, &stats))
+	}
+}
+
 func (s *GameSession) storeGroupMemberStats(upd *events.GroupMemberStatsUpdate) {
 	if s.groupMemberStats == nil {
 		s.groupMemberStats = map[uint64]events.GroupMemberStatsUpdate{}
@@ -773,6 +817,18 @@ func (s *GameSession) storeGroupMemberStats(upd *events.GroupMemberStatsUpdate) 
 	if upd.MaxPower != nil {
 		merged.MaxPower = upd.MaxPower
 	}
+	if upd.PosX != nil {
+		merged.PosX = upd.PosX
+	}
+	if upd.PosY != nil {
+		merged.PosY = upd.PosY
+	}
+	if upd.IsDead != nil {
+		merged.IsDead = upd.IsDead
+	}
+	if upd.IsGhost != nil {
+		merged.IsGhost = upd.IsGhost
+	}
 	s.groupMemberStats[upd.MemberGUID] = merged
 }
 
@@ -781,20 +837,22 @@ func (s *GameSession) storeGroupMemberStats(upd *events.GroupMemberStatsUpdate) 
 func buildPartyMemberStatsFullPacket(guid uint64, stats *events.GroupMemberStatsUpdate) *packet.Packet {
 	w := packet.NewWriter(packet.SMsgPartyMemberStatsFull)
 	w.Uint8(0) // arena/bg related flag
-	writePartyMemberStats(w, guid, stats)
+	writePartyMemberStats(w, guid, stats, stats)
 	return w.ToPacket()
 }
 
 // buildPartyMemberStatsPacket builds an incremental SMSG_PARTY_MEMBER_STATS packet.
 // The status field is always included so that members reported as offline by the
 // game server (which is not aware of gateway-managed groups) get back online.
-func buildPartyMemberStatsPacket(upd *events.GroupMemberStatsUpdate) *packet.Packet {
+// statusOf carries the merged stats the status flags are derived from: deriving
+// them from the increment alone would reset DEAD/GHOST on any unrelated update.
+func buildPartyMemberStatsPacket(upd *events.GroupMemberStatsUpdate, statusOf *events.GroupMemberStatsUpdate) *packet.Packet {
 	w := packet.NewWriter(packet.SMsgPartyMemberStats)
-	writePartyMemberStats(w, upd.MemberGUID, upd)
+	writePartyMemberStats(w, upd.MemberGUID, upd, statusOf)
 	return w.ToPacket()
 }
 
-func writePartyMemberStats(w *packet.Writer, guid uint64, upd *events.GroupMemberStatsUpdate) {
+func writePartyMemberStats(w *packet.Writer, guid uint64, upd *events.GroupMemberStatsUpdate, statusOf *events.GroupMemberStatsUpdate) {
 	mask := uint32(groupUpdateFlagStatus)
 
 	if upd.CurHP != nil {
@@ -818,11 +876,23 @@ func writePartyMemberStats(w *packet.Writer, guid uint64, upd *events.GroupMembe
 	if upd.Zone != nil {
 		mask |= groupUpdateFlagZone
 	}
+	if upd.PosX != nil && upd.PosY != nil {
+		mask |= groupUpdateFlagPosition
+	}
 
 	w.GUID(guid)
 	w.Uint32(mask)
 
-	w.Uint16(memberStatusOnline)
+	status := uint16(memberStatusOnline)
+	if statusOf != nil {
+		if statusOf.IsDead != nil && *statusOf.IsDead {
+			status |= memberStatusDead
+		}
+		if statusOf.IsGhost != nil && *statusOf.IsGhost {
+			status |= memberStatusGhost
+		}
+	}
+	w.Uint16(status)
 
 	if upd.CurHP != nil {
 		w.Uint32(*upd.CurHP)
@@ -844,6 +914,12 @@ func writePartyMemberStats(w *packet.Writer, guid uint64, upd *events.GroupMembe
 	}
 	if upd.Zone != nil {
 		w.Uint16(uint16(*upd.Zone))
+	}
+
+	if upd.PosX != nil && upd.PosY != nil {
+		// AC sends truncated world coordinates; int16 keeps negative coords intact.
+		w.Uint16(uint16(int16(*upd.PosX)))
+		w.Uint16(uint16(int16(*upd.PosY)))
 	}
 }
 

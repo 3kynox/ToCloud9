@@ -19,8 +19,17 @@ const (
 	unitFieldMaxHealth = objectEnd + 0x1A
 	unitFieldMaxPower1 = objectEnd + 0x1B
 	unitFieldLevel     = objectEnd + 0x30
+	unitFieldFlags     = objectEnd + 0x35
+	unitEnd            = objectEnd + 0x8E
+	playerFieldFlags   = unitEnd + 0x2
 
 	powersCount = 7
+)
+
+// Flag values of tracked bit fields (see AzerothCore UnitDefines.h / Player.h).
+const (
+	UnitFlagInCombat = 0x00080000
+	PlayerFlagGhost  = 0x00000010
 )
 
 // Update types (see AzerothCore UpdateData.h).
@@ -68,17 +77,20 @@ const (
 
 // UnitStatsUpdate holds stats-related unit fields extracted from an update object packet.
 type UnitStatsUpdate struct {
-	Level     *uint32
-	CurHP     *uint32
-	MaxHP     *uint32
-	PowerType *uint8
-	Powers    [powersCount]*uint32
-	MaxPowers [powersCount]*uint32
+	Level       *uint32
+	CurHP       *uint32
+	MaxHP       *uint32
+	PowerType   *uint8
+	Powers      [powersCount]*uint32
+	MaxPowers   [powersCount]*uint32
+	UnitFlags   *uint32
+	PlayerFlags *uint32
 }
 
 // IsEmpty returns true if no tracked field was present in the packet.
 func (u *UnitStatsUpdate) IsEmpty() bool {
-	if u.Level != nil || u.CurHP != nil || u.MaxHP != nil || u.PowerType != nil {
+	if u.Level != nil || u.CurHP != nil || u.MaxHP != nil || u.PowerType != nil ||
+		u.UnitFlags != nil || u.PlayerFlags != nil {
 		return false
 	}
 	for i := 0; i < powersCount; i++ {
@@ -190,6 +202,12 @@ func parseValuesBlock(r *Reader, isTarget bool, upd *UnitStatsUpdate) {
 			case idx == unitFieldLevel:
 				v := val
 				upd.Level = &v
+			case idx == unitFieldFlags:
+				v := val
+				upd.UnitFlags = &v
+			case idx == playerFieldFlags:
+				v := val
+				upd.PlayerFlags = &v
 			case idx >= unitFieldPower1 && idx < unitFieldPower1+powersCount:
 				v := val
 				upd.Powers[idx-unitFieldPower1] = &v

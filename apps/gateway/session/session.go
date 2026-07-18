@@ -71,6 +71,11 @@ type GameSession struct {
 	accountID uint32
 	character *LoggedInCharacter
 
+	// groupListSentInCombat is set when a group list packet was sent while the
+	// player was in combat: the client ignores it (combat lockdown, BUG-044)
+	// and the list needs to be resent once combat drops.
+	groupListSentInCombat bool
+
 	// groupMemberStats holds last known stats of the character's group members,
 	// fed by group members updated events. Used to answer party member stats requests.
 	groupMemberStats map[uint64]events.GroupMemberStatsUpdate
@@ -671,6 +676,14 @@ type LoggedInCharacter struct {
 	PowerType uint8
 	CurPower  uint32
 	MaxPower  uint32
+	IsDead    bool
+	IsGhost   bool
+	InCombat  bool
+
+	// Position publishing throttle state (group member map dot).
+	lastPublishedPosX float32
+	lastPublishedPosY float32
+	lastPosPublishAt  time.Time
 
 	ignoreNextInterceptToNewMap *uint32
 

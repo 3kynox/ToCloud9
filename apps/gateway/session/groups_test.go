@@ -222,3 +222,36 @@ func TestHandleRequestPartyMemberStatsGameServerManagedGroup(t *testing.T) {
 		assert.Equal(t, p, (*forwardedToWorld)[0])
 	}
 }
+
+func float32Ptr(v float32) *float32 { return &v }
+func boolPtr(v bool) *bool          { return &v }
+
+// TestPartyMemberStatsStatusFromMergedStats: DEAD/GHOST bits must derive from the
+// merged cache, so an unrelated increment can't reset a dead member to alive.
+func TestPartyMemberStatsStatusFromMergedStats(t *testing.T) {
+	upd := &events.GroupMemberStatsUpdate{MemberGUID: 7, CurHP: uint32Ptr(0)}
+	merged := &events.GroupMemberStatsUpdate{MemberGUID: 7, IsDead: boolPtr(true), IsGhost: boolPtr(true)}
+
+	r := buildPartyMemberStatsPacket(upd, merged).Reader()
+	r.ReadGUID()
+	r.Uint32() // mask
+	assert.Equal(t, uint16(memberStatusOnline|memberStatusDead|memberStatusGhost), r.Uint16())
+
+	// Without merged stats the member stays plain online.
+	r = buildPartyMemberStatsPacket(upd, nil).Reader()
+	r.ReadGUID()
+	r.Uint32()
+	assert.Equal(t, uint16(memberStatusOnline), r.Uint16())
+}
+
+func TestPartyMemberStatsWritesPosition(t *testing.T) {
+	upd := &events.GroupMemberStatsUpdate{MemberGUID: 7, PosX: float32Ptr(-1234.7), PosY: float32Ptr(88.2)}
+
+	r := buildPartyMemberStatsPacket(upd, nil).Reader()
+	r.ReadGUID()
+	mask := r.Uint32()
+	assert.NotZero(t, mask&groupUpdateFlagPosition)
+	r.Uint16() // status
+	assert.Equal(t, int16(-1234), int16(r.Uint16()))
+	assert.Equal(t, int16(88), int16(r.Uint16()))
+}

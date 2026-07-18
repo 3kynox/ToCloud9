@@ -59,6 +59,18 @@ func (b *CharactersUpdatesBarrier) UpdateMaxPower(charGUID uint64, maxPower uint
 	b.updsChan <- events.CharacterUpdate{ID: charGUID, MaxPower: &maxPower}
 }
 
+func (b *CharactersUpdatesBarrier) UpdatePosition(charGUID uint64, x, y float32) {
+	b.updsChan <- events.CharacterUpdate{ID: charGUID, PosX: &x, PosY: &y}
+}
+
+func (b *CharactersUpdatesBarrier) UpdateDeadState(charGUID uint64, dead bool) {
+	b.updsChan <- events.CharacterUpdate{ID: charGUID, IsDead: &dead}
+}
+
+func (b *CharactersUpdatesBarrier) UpdateGhostState(charGUID uint64, ghost bool) {
+	b.updsChan <- events.CharacterUpdate{ID: charGUID, IsGhost: &ghost}
+}
+
 func (b *CharactersUpdatesBarrier) Run(ctx context.Context) {
 	t := time.NewTicker(b.barrierOpenTime)
 	buffer := map[uint64]*events.CharacterUpdate{}
@@ -154,6 +166,22 @@ func mergeCharUpdates(oldCharUpd, newCharUpd events.CharacterUpdate) events.Char
 
 	if newCharUpd.MaxPower != nil {
 		oldCharUpd.MaxPower = newCharUpd.MaxPower
+	}
+
+	if newCharUpd.PosX != nil {
+		oldCharUpd.PosX = newCharUpd.PosX
+	}
+
+	if newCharUpd.PosY != nil {
+		oldCharUpd.PosY = newCharUpd.PosY
+	}
+
+	if newCharUpd.IsDead != nil {
+		oldCharUpd.IsDead = newCharUpd.IsDead
+	}
+
+	if newCharUpd.IsGhost != nil {
+		oldCharUpd.IsGhost = newCharUpd.IsGhost
 	}
 
 	return oldCharUpd

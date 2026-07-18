@@ -250,6 +250,11 @@ type GroupMemberStatsUpdate struct {
 	PowerType *uint8  `json:"PowerType,omitempty"`
 	CurPower  *uint32 `json:"CurPower,omitempty"`
 	MaxPower  *uint32 `json:"MaxPower,omitempty"`
+
+	PosX    *float32 `json:"PosX,omitempty"`
+	PosY    *float32 `json:"PosY,omitempty"`
+	IsDead  *bool    `json:"IsDead,omitempty"`
+	IsGhost *bool    `json:"IsGhost,omitempty"`
 }
 
 type GroupMember struct {

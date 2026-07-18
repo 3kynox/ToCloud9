@@ -140,6 +140,10 @@ func (c *MembersStatsCollector) flush(ctx context.Context) {
 				PowerType:  upd.PowerType,
 				CurPower:   upd.CurPower,
 				MaxPower:   upd.MaxPower,
+				PosX:       upd.PosX,
+				PosY:       upd.PosY,
+				IsDead:     upd.IsDead,
+				IsGhost:    upd.IsGhost,
 			})
 		}
 
@@ -193,5 +197,21 @@ func mergeCharacterUpdate(dst *events.CharacterUpdate, src *events.CharacterUpda
 
 	if src.MaxPower != nil {
 		dst.MaxPower = src.MaxPower
+	}
+
+	if src.PosX != nil {
+		dst.PosX = src.PosX
+	}
+
+	if src.PosY != nil {
+		dst.PosY = src.PosY
+	}
+
+	if src.IsDead != nil {
+		dst.IsDead = src.IsDead
+	}
+
+	if src.IsGhost != nil {
+		dst.IsGhost = src.IsGhost
 	}
 }

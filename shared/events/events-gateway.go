@@ -76,4 +76,10 @@ type CharacterUpdate struct {
 	PowerType *uint8  `json:"pt,omitempty"`
 	CurPower  *uint32 `json:"p,omitempty"`
 	MaxPower  *uint32 `json:"pm,omitempty"`
+
+	// Phase B group member stats: world position (map dot) and death state.
+	PosX    *float32 `json:"x,omitempty"`
+	PosY    *float32 `json:"y,omitempty"`
+	IsDead  *bool    `json:"d,omitempty"`
+	IsGhost *bool    `json:"g,omitempty"`
 }
