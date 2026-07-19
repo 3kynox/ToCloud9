@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -165,4 +166,42 @@ func TestBattlegroundStatusChangedEndedPurgesInvitedLinks(t *testing.T) {
 
 	assert.Empty(t, s.GetQueueOrBattlegroundLinkForPlayer(QueuesByRealmAndPlayerKey{activePlayer}))
 	assert.Empty(t, s.GetQueueOrBattlegroundLinkForPlayer(QueuesByRealmAndPlayerKey{invitedPlayer}))
+}
+
+func TestAddQueueForGroupMembersIfFreeConcurrent(t *testing.T) {
+	s := &battleGroundService{
+		playersQueueOrBattleground: make(map[QueuesByRealmAndPlayerKey][]QueueOrBattlegroundLink),
+	}
+	queue := &GenericBattlegroundQueue{}
+
+	makeGroup := func() *QueuedGroup {
+		return &QueuedGroup{
+			LeaderGUID: guid.PlayerUnwrapped{RealmID: 1, LowGUID: 1},
+			Members:    []guid.PlayerUnwrapped{{RealmID: 1, LowGUID: 2}},
+		}
+	}
+
+	const attempts = 16
+	errs := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := s.addQueueForGroupMembersIfFree(queue, makeGroup())
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	succeeded := 0
+	for err := range errs {
+		if err == nil {
+			succeeded++
+		} else {
+			assert.ErrorIs(t, err, ErrAlreadyInQueue)
+		}
+	}
+	assert.Equal(t, 1, succeeded, "exactly one concurrent enqueue must win")
 }
