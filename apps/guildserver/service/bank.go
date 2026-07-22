@@ -282,6 +282,10 @@ func (g *guildBankServiceImpl) BankDepositItem(ctx context.Context, realmID uint
 		}
 	}
 
+	// The wire carries the full 64-bit ObjectGuid; guild_bank_item.item_guid
+	// stores the 32-bit counter, like item_instance.guid it references.
+	item.ItemGUID &= 0xFFFFFFFF
+
 	placedSlot, err := g.bankRepo.DepositItem(ctx, realmID, guildID, playerGUID, tab, slot, item, !restore)
 	if err != nil {
 		return 0, err

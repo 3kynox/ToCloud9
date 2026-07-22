@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/walkline/ToCloud9/gen/guilds/pb"
 )
 
-// bankStatusError maps bank business errors to grpc status codes.
+// bankStatusError maps bank business errors to grpc status codes. Unexpected
+// errors (DB failures and the like) are logged here: the gateway only relays
+// clean business codes to the client, so this is where they surface.
 func bankStatusError(err error) error {
 	switch {
 	case err == nil:
@@ -33,6 +36,7 @@ func bankStatusError(err error) error {
 		errors.Is(err, repo.ErrBankSplitUnsupported):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	}
+	log.Warn().Err(err).Msg("guild bank operation failed with unexpected error")
 	return err
 }
 

@@ -26,6 +26,7 @@ const (
 	guildCommandViewTab  = 21 // GUILD_COMMAND_VIEW_TAB
 	guildCommandMoveItem = 22 // GUILD_COMMAND_MOVE_ITEM
 
+	guildErrInternal       = 1  // ERR_GUILD_INTERNAL
 	guildErrWithdrawLimit  = 25 // ERR_GUILD_WITHDRAW_LIMIT
 	guildErrNotEnoughMoney = 26 // ERR_GUILD_NOT_ENOUGH_MONEY
 	guildErrBankFull       = 28 // ERR_GUILD_BANK_FULL
@@ -376,6 +377,8 @@ func (s *GameSession) HandleGuildBankSwapItems(ctx context.Context, p *packet.Pa
 }
 
 // handleGuildBankItemError surfaces item operation failures to the client.
+// Every path must answer something: a swallowed error leaves the client
+// with a dead drag and no trace anywhere.
 func (s *GameSession) handleGuildBankItemError(err error) {
 	switch status.Code(err) {
 	case codes.PermissionDenied:
@@ -388,6 +391,9 @@ func (s *GameSession) handleGuildBankItemError(err error) {
 			return
 		}
 		s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrBankFull)
+	default:
+		s.logger.Warn().Err(err).Msg("guild bank item operation failed")
+		s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrInternal)
 	}
 }
 
@@ -522,6 +528,11 @@ func (s *GameSession) withdrawGuildBankItem(ctx context.Context, tab, slot uint8
 			s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrPermissions)
 		case codes.FailedPrecondition:
 			s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrWithdrawLimit)
+		case codes.NotFound:
+			s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrItemNotFound)
+		default:
+			s.logger.Warn().Err(err).Msg("guild bank withdraw failed")
+			s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrInternal)
 		}
 		return nil
 	}

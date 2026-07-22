@@ -199,10 +199,14 @@ func TestBankDepositItemRightsAndRestore(t *testing.T) {
 	assert.NotNil(t, bankRepo.depositedItem)
 	assert.False(t, bankRepo.depositLogged)
 
-	// Guild master deposits freely, logged.
+	// Guild master deposits freely, logged. The wire guid (full 64-bit
+	// ObjectGuid, high bits 0x4000...) must be normalized to the counter
+	// that guild_bank_item.item_guid (int unsigned) references.
+	item.ItemGUID = 0x4000000000000000 | 42
 	_, err = svc.BankDepositItem(context.Background(), 1, 7, testLeaderGUID, 0, 3, item, false)
 	assert.Nil(t, err)
 	assert.True(t, bankRepo.depositLogged)
+	assert.Equal(t, uint64(42), bankRepo.depositedItem.ItemGUID)
 }
 
 func TestBankMoveItemRights(t *testing.T) {
