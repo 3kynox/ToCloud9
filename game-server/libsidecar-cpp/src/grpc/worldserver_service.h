@@ -13,6 +13,7 @@ namespace tc9 {
 // C++ bindings struct to hold C callback pointers
 struct CppBindings {
     TC9GetPlayerItemsByGuidsHandler get_player_items = nullptr;
+    TC9GetPlayerItemByPosHandler get_player_item_by_pos = nullptr;
     TC9RemoveItemsWithGuidsFromPlayerHandler remove_items = nullptr;
     TC9AddExistingItemToPlayerHandler add_item = nullptr;
     TC9GetMoneyForPlayerHandler get_money = nullptr;
@@ -41,6 +42,11 @@ public:
         grpc::ServerContext* context,
         const v1::GetPlayerItemsByGuidsRequest* request,
         v1::GetPlayerItemsByGuidsResponse* response) override;
+
+    grpc::Status GetPlayerItemByPos(
+        grpc::ServerContext* context,
+        const v1::GetPlayerItemByPosRequest* request,
+        v1::GetPlayerItemByPosResponse* response) override;
 
     grpc::Status RemoveItemsWithGuidsFromPlayer(
         grpc::ServerContext* context,

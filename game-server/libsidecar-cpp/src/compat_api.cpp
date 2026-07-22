@@ -323,6 +323,18 @@ GetPlayerItemsByGuidsResponse CallGetPlayerItemsByGuidsHandler(uint64_t /*player
     return resp;
 }
 
+void SetGetPlayerItemByPosHandler(GetPlayerItemByPosHandler h) {
+    // Prefer TC9SetGetPlayerItemByPosHandler; kept for surface completeness.
+    (void)h;
+    spdlog::warn("SetGetPlayerItemByPosHandler: Bridging not yet implemented");
+}
+
+GetPlayerItemByPosResponse CallGetPlayerItemByPosHandler(uint64_t /*player_guid*/, uint8_t /*bag*/, uint8_t /*slot*/) {
+    GetPlayerItemByPosResponse resp{};
+    resp.errorCode = PlayerItemErrorCodeNoHandler;
+    return resp;
+}
+
 void SetRemoveItemsWithGuidsFromPlayerHandler(RemoveItemsWithGuidsFromPlayerHandler h) {
     g_compat_handlers.remove_items = h;
     spdlog::warn("SetRemoveItemsWithGuidsFromPlayerHandler: Bridging not yet implemented");

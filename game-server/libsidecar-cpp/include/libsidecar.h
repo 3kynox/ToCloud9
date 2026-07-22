@@ -149,6 +149,7 @@ TC9_API void TC9SetCanPlayerInteractWithNPCAndFlagsHandler(CanPlayerInteractWith
 TC9_API void TC9SetCanPlayerInteractWithGOAndTypeHandler(CanPlayerInteractWithGOAndTypeHandler h);
 
 TC9_API void TC9SetGetPlayerItemsByGuidsHandler(GetPlayerItemsByGuidsHandler h);
+TC9_API void TC9SetGetPlayerItemByPosHandler(GetPlayerItemByPosHandler h);
 TC9_API void TC9SetRemoveItemsWithGuidsFromPlayerHandler(RemoveItemsWithGuidsFromPlayerHandler h);
 TC9_API void TC9SetAddExistingItemToPlayerHandler(AddExistingItemToPlayerHandler h);
 

@@ -50,6 +50,10 @@ type BattlegroundAddPlayersRequest struct {
 
 type GetPlayerItemsByGuidsHandler func(player uint64, items []uint64) ([]PlayerItem, error)
 
+// GetPlayerItemByPosHandler resolves an item by its live inventory position.
+// A nil item without error means nothing sits at this position.
+type GetPlayerItemByPosHandler func(player uint64, bag, slot uint8) (*PlayerItem, error)
+
 type RemoveItemsWithGuidsFromPlayerHandler func(player uint64, items []uint64, assignToPlayer uint64) ([]uint64, error)
 
 type AddExistingItemToPlayerHandler func(player uint64, item *ItemToAdd) error
@@ -93,6 +97,7 @@ type CanTurnInGuildPetitionHandler func(playerGUID, petitionItemGUID uint64) (*G
 
 type CppBindings struct {
 	GetPlayerItemsByGuids           GetPlayerItemsByGuidsHandler
+	GetPlayerItemByPos              GetPlayerItemByPosHandler
 	RemoveItemsWithGuidsFromPlayer  RemoveItemsWithGuidsFromPlayerHandler
 	AddExistingItemToPlayer         AddExistingItemToPlayerHandler
 	GetMoneyForPlayer               GetMoneyForPlayerHandler

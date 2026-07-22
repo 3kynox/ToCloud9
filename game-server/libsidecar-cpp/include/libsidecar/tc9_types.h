@@ -44,6 +44,13 @@ typedef struct TC9GetPlayerItemsResponse {
     int itemsSize;
 } TC9GetPlayerItemsResponse;
 
+/* Get Player Item By Position Response */
+typedef struct TC9GetPlayerItemByPosResponse {
+    int errorCode;
+    bool found;
+    TC9PlayerItem item;  /* Valid when errorCode == 0 and found */
+} TC9GetPlayerItemByPosResponse;
+
 /* Remove Items Response */
 typedef struct TC9RemoveItemsResponse {
     int errorCode;
@@ -105,6 +112,13 @@ typedef TC9GetPlayerItemsResponse (*TC9GetPlayerItemsByGuidsHandler)(
     uint64_t playerGuid,
     uint64_t* itemGuids,
     int itemGuidsSize
+);
+
+/* Get player item by inventory position */
+typedef TC9GetPlayerItemByPosResponse (*TC9GetPlayerItemByPosHandler)(
+    uint64_t playerGuid,
+    uint8_t bag,
+    uint8_t slot
 );
 
 /* Remove items from player */
