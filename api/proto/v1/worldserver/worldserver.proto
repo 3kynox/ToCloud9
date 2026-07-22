@@ -10,6 +10,9 @@ service WorldServerService {
   rpc GetPlayerItemsByGuids(GetPlayerItemsByGuidsRequest) returns (GetPlayerItemsByGuidsResponse);
   rpc RemoveItemsWithGuidsFromPlayer(RemoveItemsWithGuidsFromPlayerRequest) returns (RemoveItemsWithGuidsFromPlayerResponse);
   rpc AddExistingItemToPlayer(AddExistingItemToPlayerRequest) returns (AddExistingItemToPlayerResponse);
+  // Resolves an item by its live inventory position. Needed by packets that
+  // carry (bag, slot) instead of the item guid, e.g. CMSG_GUILD_BANK_SWAP_ITEMS.
+  rpc GetPlayerItemByPos(GetPlayerItemByPosRequest) returns (GetPlayerItemByPosResponse);
 
   // Money
   rpc GetMoneyForPlayer(GetMoneyForPlayerRequest) returns (GetMoneyForPlayerResponse);
@@ -99,6 +102,23 @@ message AddExistingItemToPlayerResponse {
   }
 
   Status status = 2;
+}
+
+// GetPlayerItemByPos
+message GetPlayerItemByPosRequest {
+  string api = 1;
+
+  uint64 playerGuid = 2;
+  // Bag slot as sent by the client (255 = backpack/base inventory).
+  uint32 bag = 3;
+  uint32 slot = 4;
+}
+
+message GetPlayerItemByPosResponse {
+  string api = 1;
+
+  // Unset when there is no item at this position.
+  GetPlayerItemsByGuidsResponse.Item item = 2;
 }
 
 // GetMoneyForPlayer
