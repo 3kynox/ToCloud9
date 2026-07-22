@@ -129,38 +129,94 @@ func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, fullUpda
 
 	resp.Uint8(uint8(len(items)))
 	for _, item := range items {
-		resp.Uint8(uint8(item.Slot))
-		resp.Uint32(item.Entry)
-		if item.Entry == 0 {
-			continue
-		}
-		resp.Int32(int32(item.Flags))
-		resp.Int32(item.RandomPropertyID)
-		if item.RandomPropertyID != 0 {
-			// Suffix factor is not tracked by the cluster bank yet.
-			resp.Int32(0)
-		}
-		resp.Int32(int32(item.Count))
-		resp.Int32(int32(item.EnchantmentID))
-		resp.Uint8(uint8(item.Charges))
+		writeBankItem(resp, uint8(item.Slot), item)
+	}
 
-		var gems []struct {
-			idx uint8
-			id  uint32
+	s.gameSocket.Send(resp)
+	return nil
+}
+
+// writeBankItem appends one SMSG_GUILD_BANK_LIST item entry. A nil item writes
+// an empty slot (ItemID 0), which the client uses to clear a slot on a partial
+// update — a full update omits empty slots, so a withdrawn item is never
+// cleared that way while the tab is already open.
+func writeBankItem(resp *packet.Writer, slot uint8, item *pbGuild.GuildBankItem) {
+	resp.Uint8(slot)
+	if item == nil || item.Entry == 0 {
+		resp.Uint32(0)
+		return
+	}
+	resp.Uint32(item.Entry)
+	resp.Int32(int32(item.Flags))
+	resp.Int32(item.RandomPropertyID)
+	if item.RandomPropertyID != 0 {
+		// Suffix factor is not tracked by the cluster bank yet.
+		resp.Int32(0)
+	}
+	resp.Int32(int32(item.Count))
+	resp.Int32(int32(item.EnchantmentID))
+	resp.Uint8(uint8(item.Charges))
+
+	var gems []struct {
+		idx uint8
+		id  uint32
+	}
+	for i, enchID := range item.SocketEnchantIDs {
+		if enchID != 0 {
+			gems = append(gems, struct {
+				idx uint8
+				id  uint32
+			}{uint8(i), enchID})
 		}
-		for i, enchID := range item.SocketEnchantIDs {
-			if enchID != 0 {
-				gems = append(gems, struct {
-					idx uint8
-					id  uint32
-				}{uint8(i), enchID})
-			}
-		}
-		resp.Uint8(uint8(len(gems)))
-		for _, gem := range gems {
-			resp.Uint8(gem.idx)
-			resp.Int32(int32(gem.id))
-		}
+	}
+	resp.Uint8(uint8(len(gems)))
+	for _, gem := range gems {
+		resp.Uint8(gem.idx)
+		resp.Int32(int32(gem.id))
+	}
+}
+
+// sendGuildBankSlots sends a partial SMSG_GUILD_BANK_LIST (fullUpdate=0) for the
+// given slots of a tab, each with its current content (empty when nothing sits
+// there). This is how AC refreshes a slot after a deposit/withdraw/move: unlike
+// a full update, it clears an emptied slot, so a withdrawn item disappears from
+// an already-open bank window.
+func (s *GameSession) sendGuildBankSlots(ctx context.Context, tab uint8, slots ...uint8) error {
+	if len(slots) == 0 {
+		return nil
+	}
+
+	state, err := s.guildBankState(ctx)
+	if err != nil {
+		return err
+	}
+	if int(tab) >= len(state.Tabs) {
+		return nil
+	}
+
+	tabResp, err := s.guildServiceClient.GetBankTab(ctx, &pbGuild.GetBankTabParams{
+		Api:        root.Ver,
+		RealmID:    root.RealmID,
+		GuildID:    uint64(s.character.GuildID),
+		PlayerGUID: s.character.GUID,
+		Tab:        uint32(tab),
+	})
+	if err != nil {
+		return err
+	}
+	bySlot := make(map[uint8]*pbGuild.GuildBankItem, len(tabResp.Items))
+	for _, item := range tabResp.Items {
+		bySlot[uint8(item.Slot)] = item
+	}
+
+	resp := packet.NewWriterWithSize(packet.SMsgGuildBankList, 0)
+	resp.Uint64(state.Money)
+	resp.Uint8(tab)
+	resp.Int32(int32(state.Tabs[tab].RemainingSlots))
+	resp.Uint8(0) // partial update, no tab-info block
+	resp.Uint8(uint8(len(slots)))
+	for _, slot := range slots {
+		writeBankItem(resp, slot, bySlot[slot])
 	}
 
 	s.gameSocket.Send(resp)
@@ -340,13 +396,13 @@ func (s *GameSession) HandleGuildBankSwapItems(ctx context.Context, p *packet.Pa
 			return nil
 		}
 
-		if err = s.sendGuildBankList(ctx, srcTab, true); err != nil {
+		if srcTab == dstTab {
+			return s.sendGuildBankSlots(ctx, srcTab, srcSlot, dstSlot)
+		}
+		if err = s.sendGuildBankSlots(ctx, srcTab, srcSlot); err != nil {
 			return err
 		}
-		if dstTab != srcTab {
-			return s.sendGuildBankList(ctx, dstTab, true)
-		}
-		return nil
+		return s.sendGuildBankSlots(ctx, dstTab, dstSlot)
 	}
 
 	tab := r.Uint8()
@@ -456,7 +512,7 @@ func (s *GameSession) depositGuildBankItem(ctx context.Context, tab, slot, bag, 
 		return nil
 	}
 
-	_, err = s.guildServiceClient.BankDepositItem(ctx, &pbGuild.BankDepositItemParams{
+	depositResp, err := s.guildServiceClient.BankDepositItem(ctx, &pbGuild.BankDepositItemParams{
 		Api:        root.Ver,
 		RealmID:    root.RealmID,
 		GuildID:    uint64(s.character.GuildID),
@@ -492,7 +548,7 @@ func (s *GameSession) depositGuildBankItem(ctx context.Context, tab, slot, bag, 
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, tab, true)
+	return s.sendGuildBankSlots(ctx, tab, uint8(depositResp.Slot))
 }
 
 func (s *GameSession) withdrawGuildBankItem(ctx context.Context, tab, slot uint8, stackCount uint32) error {
@@ -570,7 +626,9 @@ func (s *GameSession) withdrawGuildBankItem(ctx context.Context, tab, slot uint8
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, tab, true)
+	// The slot is now empty: a partial update clears it client-side (a full
+	// update would omit it and leave the withdrawn item on screen).
+	return s.sendGuildBankSlots(ctx, tab, slot)
 }
 
 // sendInventoryFullError shows the standard "Inventory is full." client error.
