@@ -740,6 +740,27 @@ func (s *GameSession) HandleSetGuildBankText(ctx context.Context, p *packet.Pack
 	return nil
 }
 
+// HandleGuildDisband and HandleGuildLeaderChange intercept the two remaining
+// dangerous guild write opcodes. Letting them fall through would make the
+// legacy in-worldserver guild code write on its boot-time stale state and
+// desync the guild service cache; until the service supports them, refusing
+// cleanly is the safe behavior.
+func (s *GameSession) HandleGuildDisband(_ context.Context, _ *packet.Packet) error {
+	if s.character.GuildID == 0 {
+		return nil
+	}
+	s.SendSysMessage("Guild disband is not supported yet on this realm. Ask a GM if you really need it.")
+	return nil
+}
+
+func (s *GameSession) HandleGuildLeaderChange(_ context.Context, _ *packet.Packet) error {
+	if s.character.GuildID == 0 {
+		return nil
+	}
+	s.SendSysMessage("Guild leader change is not supported yet on this realm. Ask a GM if you really need it.")
+	return nil
+}
+
 // Bank events pushed by the guild service.
 
 func (s *GameSession) HandleEventGuildBankMoneyUpdated(_ context.Context, e *eBroadcaster.Event) error {
