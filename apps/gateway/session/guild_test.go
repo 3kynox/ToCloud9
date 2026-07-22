@@ -150,12 +150,14 @@ func TestPromoteEventPushesPermissionsToPromotedMember(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	if assert.Len(t, *sentToClient, 2) {
+	if assert.Len(t, *sentToClient, 3) {
 		assert.Equal(t, packet.SMsgGuildEvent, (*sentToClient)[0].Opcode)
 		assert.Equal(t, packet.MsgGuildPermissions, (*sentToClient)[1].Opcode)
 		r := (*sentToClient)[1].ToPacket().Reader()
 		assert.Equal(t, uint32(1), r.Uint32())     // rank id
 		assert.Equal(t, uint32(0xFFF), r.Uint32()) // rank flags
+		// The guild UI re-arms its buttons from the roster (BUG-TC9-049).
+		assert.Equal(t, packet.SMsgGuildRoster, (*sentToClient)[2].Opcode)
 	}
 }
 
@@ -191,7 +193,8 @@ func TestDemoteEventPushesPermissionsToDemotedMember(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	if assert.Len(t, *sentToClient, 2) {
+	if assert.Len(t, *sentToClient, 3) {
 		assert.Equal(t, packet.MsgGuildPermissions, (*sentToClient)[1].Opcode)
+		assert.Equal(t, packet.SMsgGuildRoster, (*sentToClient)[2].Opcode)
 	}
 }

@@ -256,7 +256,13 @@ func (s *GameSession) HandleEventGuildMemberPromoted(ctx context.Context, e *eBr
 	))
 
 	if eventData.MemberGUID == s.character.GUID {
-		return s.sendGuildPermissions(ctx)
+		if err := s.sendGuildPermissions(ctx); err != nil {
+			return err
+		}
+		// The guild UI arms its buttons (invite, promote, ...) from the roster
+		// data, not from MSG_GUILD_PERMISSIONS: push a fresh roster so the new
+		// rank rights apply without a relog (BUG-TC9-049).
+		return s.HandleGuildRoster(ctx, nil)
 	}
 
 	return nil
@@ -273,7 +279,11 @@ func (s *GameSession) HandleEventGuildMemberDemoted(ctx context.Context, e *eBro
 	))
 
 	if eventData.MemberGUID == s.character.GUID {
-		return s.sendGuildPermissions(ctx)
+		if err := s.sendGuildPermissions(ctx); err != nil {
+			return err
+		}
+		// Same as the promote path: revoke the stale button state too.
+		return s.HandleGuildRoster(ctx, nil)
 	}
 
 	return nil
