@@ -38,6 +38,7 @@ func SetupGRPCService(conf *config.Config) (net.Listener, *grpc.Server) {
 				AddExistingItemToPlayer:         AddExistingItemToPlayerHandler,
 				GetMoneyForPlayer:               GetMoneyForPlayerHandler,
 				ModifyMoneyForPlayer:            ModifyMoneyForPlayerHandler,
+				SetPlayerGuildFields:            SetPlayerGuildFieldsHandler,
 				CanPlayerInteractWithNPC:        CanPlayerInteractWithNPCAndFlagsHandler,
 				CanPlayerInteractWithGO:         CanPlayerInteractWithGOAndTypeHandler,
 				StartBattleground:               BattlegroundStartHandler,

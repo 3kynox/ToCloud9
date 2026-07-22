@@ -148,6 +148,14 @@ typedef uint32_t (*TC9ModifyMoneyForPlayerHandler)(
     int* errorCode  /* OUT: error code */
 );
 
+/* Set player guild fields (guild id + rank) on the live player object */
+typedef bool (*TC9SetPlayerGuildFieldsHandler)(
+    uint64_t playerGuid,
+    uint32_t guildId,
+    uint32_t rank,
+    int* errorCode  /* OUT: error code */
+);
+
 /* Can player interact with NPC */
 typedef bool (*TC9CanPlayerInteractWithNPCHandler)(
     uint64_t playerGuid,

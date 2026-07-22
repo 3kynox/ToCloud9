@@ -62,6 +62,9 @@ type GetMoneyForPlayerHandler func(player uint64) (uint32, error)
 
 type ModifyMoneyForPlayerHandler func(player uint64, value int32) (uint32, error)
 
+// SetPlayerGuildFieldsHandler refreshes a player's guild id/rank unit fields.
+type SetPlayerGuildFieldsHandler func(player uint64, guildID, rank uint32) (bool, error)
+
 type CanPlayerInteractWithNPCWithFlagsHandler func(player, npc uint64, flag uint32) (bool, error)
 
 type CanPlayerInteractWithGOWithTypeHandler func(player, goGUID uint64, goType uint8) (bool, error)
@@ -102,6 +105,7 @@ type CppBindings struct {
 	AddExistingItemToPlayer         AddExistingItemToPlayerHandler
 	GetMoneyForPlayer               GetMoneyForPlayerHandler
 	ModifyMoneyForPlayer            ModifyMoneyForPlayerHandler
+	SetPlayerGuildFields            SetPlayerGuildFieldsHandler
 	CanPlayerInteractWithNPC        CanPlayerInteractWithNPCWithFlagsHandler
 	CanPlayerInteractWithGO         CanPlayerInteractWithGOWithTypeHandler
 	StartBattleground               StartBattlegroundHandler

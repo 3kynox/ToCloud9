@@ -794,6 +794,24 @@ TC9_API void TC9SetModifyMoneyForPlayerHandler(ModifyMoneyForPlayerHandler handl
     spdlog::debug("ModifyMoneyForPlayer handler registered");
 }
 
+TC9_API void TC9SetSetPlayerGuildFieldsHandler(SetPlayerGuildFieldsHandler handler) {
+    static SetPlayerGuildFieldsHandler stored_handler = nullptr;
+    stored_handler = handler;
+
+    g_state.bindings.set_player_guild_fields = [](uint64_t playerGuid, uint32_t guildId, uint32_t rank, int* errorCode) -> bool {
+        if (stored_handler) {
+            SetPlayerGuildFieldsResponse old_resp = stored_handler(playerGuid, guildId, rank);
+            *errorCode = old_resp.errorCode;
+            return old_resp.applied;
+        }
+
+        *errorCode = TC9_ERROR_NO_HANDLER;
+        return false;
+    };
+
+    spdlog::debug("SetPlayerGuildFields handler registered");
+}
+
 TC9_API void TC9SetCanPlayerInteractWithNPCAndFlagsHandler(CanPlayerInteractWithNPCAndFlagsHandler handler) {
     static CanPlayerInteractWithNPCAndFlagsHandler stored_handler = nullptr;
     stored_handler = handler;

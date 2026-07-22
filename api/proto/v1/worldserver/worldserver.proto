@@ -22,6 +22,12 @@ service WorldServerService {
   rpc CanPlayerInteractWithNPC(CanPlayerInteractWithNPCRequest) returns (CanPlayerInteractWithNPCResponse);
   rpc CanPlayerInteractWithGameObject(CanPlayerInteractWithGameObjectRequest) returns (CanPlayerInteractWithGameObjectResponse);
 
+  // Refreshes the guild id/rank unit fields on a live player object. In
+  // cluster mode guild membership changes happen in the guild service, so the
+  // worldserver's PLAYER_GUILDID/PLAYER_GUILDRANK fields go stale until relog;
+  // the client gates the guild control buttons on those fields, not the roster.
+  rpc SetPlayerGuildFields(SetPlayerGuildFieldsRequest) returns (SetPlayerGuildFieldsResponse);
+
   // Battlegrounds
   rpc StartBattleground(StartBattlegroundRequest) returns (StartBattlegroundResponse);
   rpc AddPlayersToBattleground(AddPlayersToBattlegroundRequest) returns (AddPlayersToBattlegroundResponse);
@@ -146,6 +152,22 @@ message ModifyMoneyForPlayerResponse {
   string api = 1;
 
   uint32 newMoneyValue = 2;
+}
+
+// SetPlayerGuildFields
+message SetPlayerGuildFieldsRequest {
+  string api = 1;
+
+  uint64 playerGuid = 2;
+  uint32 guildID = 3;
+  uint32 rank = 4;
+}
+
+message SetPlayerGuildFieldsResponse {
+  string api = 1;
+
+  // False when the player is not online on this worldserver.
+  bool applied = 2;
 }
 
 // CanPlayerInteractWithNPC

@@ -16,6 +16,7 @@ import (
 	mocks "github.com/walkline/ToCloud9/apps/gateway/sockets/socketmock"
 	pbChar "github.com/walkline/ToCloud9/gen/characters/pb"
 	pbGuild "github.com/walkline/ToCloud9/gen/guilds/pb"
+	pbWorld "github.com/walkline/ToCloud9/gen/worldserver/pb"
 	"github.com/walkline/ToCloud9/shared/events"
 )
 
@@ -60,15 +61,28 @@ func guildTestSession(t *testing.T, guildClient pbGuild.GuildServiceClient, char
 		*sentToClient = append(*sentToClient, args.Get(0).(*packet.Writer))
 	}).Return()
 
+	worldClient := &worldServerGuildFieldsMock{}
+
 	session := &GameSession{
-		logger:             &log.Logger,
-		gameSocket:         gameSocket,
-		character:          &LoggedInCharacter{GUID: 42, GuildID: 7},
-		guildServiceClient: guildClient,
-		charServiceClient:  charClient,
+		logger:               &log.Logger,
+		gameSocket:           gameSocket,
+		character:            &LoggedInCharacter{GUID: 42, GuildID: 7},
+		guildServiceClient:   guildClient,
+		charServiceClient:    charClient,
+		gameServerGRPCClient: worldClient,
 	}
 
 	return session, sentToClient
+}
+
+// worldServerGuildFieldsMock answers SetPlayerGuildFields; the rank refresh on
+// promote/demote calls it before touching the client UI.
+type worldServerGuildFieldsMock struct {
+	pbWorld.WorldServerServiceClient
+}
+
+func (m *worldServerGuildFieldsMock) SetPlayerGuildFields(_ context.Context, _ *pbWorld.SetPlayerGuildFieldsRequest, _ ...grpc.CallOption) (*pbWorld.SetPlayerGuildFieldsResponse, error) {
+	return &pbWorld.SetPlayerGuildFieldsResponse{Applied: true}, nil
 }
 
 func guildInvitePacket(name string) *packet.Packet {

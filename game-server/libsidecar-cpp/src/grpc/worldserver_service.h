@@ -18,6 +18,7 @@ struct CppBindings {
     TC9AddExistingItemToPlayerHandler add_item = nullptr;
     TC9GetMoneyForPlayerHandler get_money = nullptr;
     TC9ModifyMoneyForPlayerHandler modify_money = nullptr;
+    TC9SetPlayerGuildFieldsHandler set_player_guild_fields = nullptr;
     TC9CanPlayerInteractWithNPCHandler interact_npc = nullptr;
     TC9CanPlayerInteractWithGOHandler interact_go = nullptr;
     TC9StartBattlegroundHandler start_bg = nullptr;
@@ -68,6 +69,11 @@ public:
         grpc::ServerContext* context,
         const v1::ModifyMoneyForPlayerRequest* request,
         v1::ModifyMoneyForPlayerResponse* response) override;
+
+    grpc::Status SetPlayerGuildFields(
+        grpc::ServerContext* context,
+        const v1::SetPlayerGuildFieldsRequest* request,
+        v1::SetPlayerGuildFieldsResponse* response) override;
 
     // Interactions
     grpc::Status CanPlayerInteractWithNPC(

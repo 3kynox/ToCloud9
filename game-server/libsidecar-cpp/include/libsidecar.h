@@ -29,6 +29,7 @@
 #include "player-interactions-api.h"
 #include "player-items-api.h"
 #include "player-money-api.h"
+#include "player-guild-api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -155,6 +156,8 @@ TC9_API void TC9SetAddExistingItemToPlayerHandler(AddExistingItemToPlayerHandler
 
 TC9_API void TC9SetGetMoneyForPlayerHandler(GetMoneyForPlayerHandler h);
 TC9_API void TC9SetModifyMoneyForPlayerHandler(ModifyMoneyForPlayerHandler h);
+
+TC9_API void TC9SetSetPlayerGuildFieldsHandler(SetPlayerGuildFieldsHandler h);
 
 #ifdef __cplusplus
 }

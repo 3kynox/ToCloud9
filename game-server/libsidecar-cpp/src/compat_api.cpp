@@ -381,6 +381,18 @@ ModifyMoneyForPlayerResponse CallModifyMoneyForPlayerHandler(uint64_t /*player_g
     return resp;
 }
 
+void SetSetPlayerGuildFieldsHandler(SetPlayerGuildFieldsHandler h) {
+    // Prefer TC9SetSetPlayerGuildFieldsHandler; kept for surface completeness.
+    (void)h;
+    spdlog::warn("SetSetPlayerGuildFieldsHandler: Bridging not yet implemented");
+}
+
+SetPlayerGuildFieldsResponse CallSetPlayerGuildFieldsHandler(uint64_t /*player_guid*/, uint32_t /*guild_id*/, uint32_t /*rank*/) {
+    SetPlayerGuildFieldsResponse resp{};
+    resp.errorCode = PlayerGuildErrorCodeNoHandler;
+    return resp;
+}
+
 // ============================================================================
 // Player Interactions API (player-interactions-api.h)
 // ============================================================================

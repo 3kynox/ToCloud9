@@ -348,6 +348,50 @@ grpc::Status WorldServerServiceImpl::GetMoneyForPlayer(
     }
 }
 
+grpc::Status WorldServerServiceImpl::SetPlayerGuildFields(
+    grpc::ServerContext* context,
+    const v1::SetPlayerGuildFieldsRequest* request,
+    v1::SetPlayerGuildFieldsResponse* response) {
+
+    response->set_api(lib_version_);
+
+    if (!bindings_.set_player_guild_fields) {
+        return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "No handler registered");
+    }
+
+    auto promise = std::make_shared<std::promise<std::pair<bool, int>>>();
+    auto future = promise->get_future();
+
+    uint64_t playerGuid = request->playerguid();
+    uint32_t guildId = request->guildid();
+    uint32_t rank = request->rank();
+
+    write_queue_.Push(MakeHandler([=]() {
+        try {
+            int error_code = 0;
+            bool applied = bindings_.set_player_guild_fields(playerGuid, guildId, rank, &error_code);
+            promise->set_value({applied, error_code});
+        } catch (...) {
+            promise->set_exception(std::current_exception());
+        }
+    }));
+
+    if (future.wait_for(timeout_) == std::future_status::timeout) {
+        return grpc::Status(grpc::StatusCode::DEADLINE_EXCEEDED, "Request timeout");
+    }
+
+    try {
+        auto [applied, error_code] = future.get();
+        if (error_code != TC9_ERROR_SUCCESS) {
+            return grpc::Status(grpc::StatusCode::INTERNAL, "Handler returned error");
+        }
+        response->set_applied(applied);
+        return grpc::Status::OK;
+    } catch (const std::exception& e) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+    }
+}
+
 grpc::Status WorldServerServiceImpl::ModifyMoneyForPlayer(
     grpc::ServerContext* context,
     const v1::ModifyMoneyForPlayerRequest* request,
