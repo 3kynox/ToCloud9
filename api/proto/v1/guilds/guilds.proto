@@ -320,6 +320,8 @@ message GuildBankItem {
   // Remaining charges of the first charged spell, absolute value.
   uint32 charges = 9;
   string text = 10;
+  // Gem enchant ids by socket index (0 = empty socket).
+  repeated uint32 socketEnchantIDs = 11;
 }
 
 message GetBankStateParams {

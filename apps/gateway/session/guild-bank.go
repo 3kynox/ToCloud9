@@ -404,6 +404,12 @@ func (s *GameSession) depositGuildBankItem(ctx context.Context, tab, slot, bag, 
 	}
 	item := itemResp.Item
 
+	if !item.IsTradable {
+		// Soulbound and otherwise untradable items never enter the bank.
+		s.sendGuildCommandResult(guildCommandMoveItem, "", guildErrItemNotFound)
+		return nil
+	}
+
 	if stackCount > 0 && stackCount < item.Count {
 		s.SendSysMessage("Splitting stacks into the guild bank is not supported yet.")
 		return nil
