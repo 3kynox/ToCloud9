@@ -65,12 +65,17 @@ func (s *GameSession) guildBankState(ctx context.Context) (*pbGuild.GetBankState
 	})
 }
 
-// sendGuildBankList sends SMSG_GUILD_BANK_LIST for one tab. withTabInfo adds
-// the tab names/icons (only valid for tab 0), withContent adds the items of
-// the tab. When the member lacks the view right, contentOptional decides
-// between sending the packet without items (bank activation) and staying
-// silent (tab query), matching the two AC paths.
-func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, withTabInfo, withContent, contentOptional bool) error {
+// sendGuildBankList sends SMSG_GUILD_BANK_LIST for one tab. When fullUpdate is
+// true the packet is a complete refresh of the tab and the item list carries
+// every occupied slot, so the client clears and re-renders the tab.
+//
+// The 3.3.5 client REQUIRES the tab-info block (names/icons) whenever
+// fullUpdate is set on tab 0: presence of that block is therefore tied
+// strictly to (fullUpdate && tab==0). Sending fullUpdate without it — as an
+// earlier version did on the post-change refresh — shifts the whole packet,
+// so the client reads the item bytes as tab names (garbage tab title) and
+// never renders the items.
+func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, fullUpdate bool) error {
 	state, err := s.guildBankState(ctx)
 	if err != nil {
 		return err
@@ -81,7 +86,7 @@ func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, withTabI
 	}
 
 	var items []*pbGuild.GuildBankItem
-	if withContent && int(tab) < len(state.Tabs) {
+	if int(tab) < len(state.Tabs) {
 		tabResp, err := s.guildServiceClient.GetBankTab(ctx, &pbGuild.GetBankTabParams{
 			Api:        root.Ver,
 			RealmID:    root.RealmID,
@@ -90,11 +95,9 @@ func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, withTabI
 			Tab:        uint32(tab),
 		})
 		if err != nil {
+			// No view right just means an empty item list; other errors abort.
 			if status.Code(err) != codes.PermissionDenied {
 				return err
-			}
-			if !contentOptional {
-				return nil
 			}
 		} else {
 			items = tabResp.Items
@@ -106,17 +109,17 @@ func (s *GameSession) sendGuildBankList(ctx context.Context, tab uint8, withTabI
 		remaining = int32(state.Tabs[tab].RemainingSlots)
 	}
 
-	fullUpdate := uint8(0)
-	if withContent {
-		fullUpdate = 1
+	fu := uint8(0)
+	if fullUpdate {
+		fu = 1
 	}
 
 	resp := packet.NewWriterWithSize(packet.SMsgGuildBankList, 0)
 	resp.Uint64(state.Money)
 	resp.Uint8(tab)
 	resp.Int32(remaining)
-	resp.Uint8(fullUpdate)
-	if withTabInfo && tab == 0 && fullUpdate != 0 {
+	resp.Uint8(fu)
+	if fullUpdate && tab == 0 {
 		resp.Uint8(uint8(len(state.Tabs)))
 		for _, t := range state.Tabs {
 			resp.String(t.Name)
@@ -179,7 +182,7 @@ func (s *GameSession) HandleGuildBankerActivate(ctx context.Context, p *packet.P
 
 	s.guildBankOpen = true
 
-	return s.sendGuildBankList(ctx, 0, fullUpdate, fullUpdate, true)
+	return s.sendGuildBankList(ctx, 0, fullUpdate)
 }
 
 func (s *GameSession) HandleGuildBankQueryTab(ctx context.Context, p *packet.Packet) error {
@@ -192,7 +195,7 @@ func (s *GameSession) HandleGuildBankQueryTab(ctx context.Context, p *packet.Pac
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, tab, false, fullUpdate, false)
+	return s.sendGuildBankList(ctx, tab, fullUpdate)
 }
 
 func (s *GameSession) HandleGuildBankDepositMoney(ctx context.Context, p *packet.Packet) error {
@@ -337,11 +340,11 @@ func (s *GameSession) HandleGuildBankSwapItems(ctx context.Context, p *packet.Pa
 			return nil
 		}
 
-		if err = s.sendGuildBankList(ctx, srcTab, false, true, false); err != nil {
+		if err = s.sendGuildBankList(ctx, srcTab, true); err != nil {
 			return err
 		}
 		if dstTab != srcTab {
-			return s.sendGuildBankList(ctx, dstTab, false, true, false)
+			return s.sendGuildBankList(ctx, dstTab, true)
 		}
 		return nil
 	}
@@ -489,7 +492,7 @@ func (s *GameSession) depositGuildBankItem(ctx context.Context, tab, slot, bag, 
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, tab, false, true, false)
+	return s.sendGuildBankList(ctx, tab, true)
 }
 
 func (s *GameSession) withdrawGuildBankItem(ctx context.Context, tab, slot uint8, stackCount uint32) error {
@@ -567,7 +570,7 @@ func (s *GameSession) withdrawGuildBankItem(ctx context.Context, tab, slot uint8
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, tab, false, true, false)
+	return s.sendGuildBankList(ctx, tab, true)
 }
 
 // sendInventoryFullError shows the standard "Inventory is full." client error.
@@ -627,7 +630,7 @@ func (s *GameSession) HandleGuildBankBuyTab(ctx context.Context, p *packet.Packe
 	if err = s.sendGuildPermissions(ctx); err != nil {
 		return err
 	}
-	return s.sendGuildBankList(ctx, 0, true, true, true)
+	return s.sendGuildBankList(ctx, 0, true)
 }
 
 func (s *GameSession) HandleGuildBankUpdateTab(ctx context.Context, p *packet.Packet) error {
@@ -660,7 +663,7 @@ func (s *GameSession) HandleGuildBankUpdateTab(ctx context.Context, p *packet.Pa
 		return nil
 	}
 
-	return s.sendGuildBankList(ctx, 0, true, true, true)
+	return s.sendGuildBankList(ctx, 0, true)
 }
 
 func (s *GameSession) HandleGuildBankLogQuery(ctx context.Context, p *packet.Packet) error {
@@ -792,7 +795,7 @@ func (s *GameSession) HandleEventGuildBankTabUpdated(ctx context.Context, e *eBr
 	if !s.guildBankOpen {
 		return nil
 	}
-	return s.sendGuildBankList(ctx, eventData.TabID, false, true, true)
+	return s.sendGuildBankList(ctx, eventData.TabID, true)
 }
 
 func (s *GameSession) HandleEventGuildBankTabsChanged(ctx context.Context, e *eBroadcaster.Event) error {
@@ -801,7 +804,7 @@ func (s *GameSession) HandleEventGuildBankTabsChanged(ctx context.Context, e *eB
 	if !s.guildBankOpen {
 		return nil
 	}
-	return s.sendGuildBankList(ctx, 0, true, true, true)
+	return s.sendGuildBankList(ctx, 0, true)
 }
 
 func (s *GameSession) HandleEventGuildBankTextUpdated(_ context.Context, e *eBroadcaster.Event) error {
