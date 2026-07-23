@@ -39,36 +39,9 @@ func (b *CharactersUpdatesBarrier) UpdateMap(charGUID uint64, mapID uint32) {
 	b.updsChan <- events.CharacterUpdate{ID: charGUID, Map: &mapID}
 }
 
-func (b *CharactersUpdatesBarrier) UpdateHealth(charGUID uint64, curHP uint32) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, CurHP: &curHP}
-}
-
-func (b *CharactersUpdatesBarrier) UpdateMaxHealth(charGUID uint64, maxHP uint32) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, MaxHP: &maxHP}
-}
-
-func (b *CharactersUpdatesBarrier) UpdatePowerType(charGUID uint64, powerType uint8) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, PowerType: &powerType}
-}
-
-func (b *CharactersUpdatesBarrier) UpdatePower(charGUID uint64, curPower uint32) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, CurPower: &curPower}
-}
-
-func (b *CharactersUpdatesBarrier) UpdateMaxPower(charGUID uint64, maxPower uint32) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, MaxPower: &maxPower}
-}
-
-func (b *CharactersUpdatesBarrier) UpdatePosition(charGUID uint64, x, y float32) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, PosX: &x, PosY: &y}
-}
-
-func (b *CharactersUpdatesBarrier) UpdateDeadState(charGUID uint64, dead bool) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, IsDead: &dead}
-}
-
-func (b *CharactersUpdatesBarrier) UpdateGhostState(charGUID uint64, ghost bool) {
-	b.updsChan <- events.CharacterUpdate{ID: charGUID, IsGhost: &ghost}
+// Update queues one update that can carry several changed fields at once.
+func (b *CharactersUpdatesBarrier) Update(upd events.CharacterUpdate) {
+	b.updsChan <- upd
 }
 
 func (b *CharactersUpdatesBarrier) Run(ctx context.Context) {

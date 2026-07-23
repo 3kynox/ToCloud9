@@ -84,7 +84,19 @@ type GameSession struct {
 	// fed by group members updated events. Used to answer party member stats requests.
 	groupMemberStats map[uint64]events.GroupMemberStatsUpdate
 
+	// groupMembersSnapshot memoizes the character's group members for a short
+	// window so a burst of stats requests for unknown GUIDs costs at most one
+	// group service call per window.
+	groupMembersSnapshot   map[uint64]bool
+	groupMembersSnapshotAt time.Time
+
 	teleportingToNewMap *uint32
+
+	// worldEntryPending is true between the login (or redirect) request and
+	// the first SMsgTimeSyncReq from the world server. During that window the
+	// world server drops STATUS_LOGGEDIN opcodes, so the gateway answers name
+	// queries itself (see HandleNameQuery).
+	worldEntryPending bool
 
 	packetSendingControl PacketSendingControl
 
@@ -309,6 +321,7 @@ func (s *GameSession) Login(ctx context.Context, p *packet.Packet) error {
 		PowerType:               powerTypeUnknown,
 	}
 	s.worldSocket = socket
+	s.worldEntryPending = true
 
 	err = s.eventsProducer.CharacterLoggedIn(&events.GWEventCharacterLoggedInPayload{
 		RealmID:     root.RealmID,

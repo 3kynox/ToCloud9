@@ -11,6 +11,7 @@ import (
 	"github.com/walkline/ToCloud9/apps/gateway/sockets"
 	"github.com/walkline/ToCloud9/gen/characters/pb"
 	pbServ "github.com/walkline/ToCloud9/gen/servers-registry/pb"
+	"github.com/walkline/ToCloud9/shared/events"
 	"github.com/walkline/ToCloud9/shared/wow/guid"
 )
 
@@ -80,23 +81,35 @@ func (s *GameSession) publishCharacterStatsSnapshot() {
 		return
 	}
 
+	curHP, maxHP := char.CurHP, char.MaxHP
+	powerType, curPower, maxPower := char.PowerType, char.CurPower, char.MaxPower
+	lvl := char.Level
+	posX, posY := char.PositionX, char.PositionY
+	isDead, isGhost := char.IsDead, char.IsGhost
+
+	barrierUpd := events.CharacterUpdate{
+		ID:      char.GUID,
+		Lvl:     &lvl,
+		PosX:    &posX,
+		PosY:    &posY,
+		IsDead:  &isDead,
+		IsGhost: &isGhost,
+	}
+
 	// MaxHP is never zero once stats are known, while CurHP == 0 is a valid
 	// state (dead player), so gate both on MaxHP.
-	if char.MaxHP != 0 {
-		s.charsUpdsBarrier.UpdateHealth(char.GUID, char.CurHP)
-		s.charsUpdsBarrier.UpdateMaxHealth(char.GUID, char.MaxHP)
+	if maxHP != 0 {
+		barrierUpd.CurHP = &curHP
+		barrierUpd.MaxHP = &maxHP
 	}
 
-	if char.PowerType != powerTypeUnknown {
-		s.charsUpdsBarrier.UpdatePowerType(char.GUID, char.PowerType)
-		s.charsUpdsBarrier.UpdatePower(char.GUID, char.CurPower)
-		s.charsUpdsBarrier.UpdateMaxPower(char.GUID, char.MaxPower)
+	if powerType != powerTypeUnknown {
+		barrierUpd.PowerType = &powerType
+		barrierUpd.CurPower = &curPower
+		barrierUpd.MaxPower = &maxPower
 	}
 
-	s.charsUpdsBarrier.UpdateLevel(char.GUID, char.Level)
-	s.charsUpdsBarrier.UpdatePosition(char.GUID, char.PositionX, char.PositionY)
-	s.charsUpdsBarrier.UpdateDeadState(char.GUID, char.IsDead)
-	s.charsUpdsBarrier.UpdateGhostState(char.GUID, char.IsGhost)
+	s.charsUpdsBarrier.Update(barrierUpd)
 }
 
 // trackCharacterStats extracts stats of the character itself from an SMSG_UPDATE_OBJECT
@@ -113,49 +126,61 @@ func (s *GameSession) trackCharacterStats(ctx context.Context, data []byte) {
 		return
 	}
 
+	barrierUpd := events.CharacterUpdate{ID: char.GUID}
+	changed := false
+
 	if upd.CurHP != nil && *upd.CurHP != char.CurHP {
 		char.CurHP = *upd.CurHP
-		s.charsUpdsBarrier.UpdateHealth(char.GUID, char.CurHP)
+		barrierUpd.CurHP = upd.CurHP
+		changed = true
 	}
 
 	if upd.MaxHP != nil && *upd.MaxHP != char.MaxHP {
 		char.MaxHP = *upd.MaxHP
-		s.charsUpdsBarrier.UpdateMaxHealth(char.GUID, char.MaxHP)
+		barrierUpd.MaxHP = upd.MaxHP
+		changed = true
 	}
 
 	if upd.PowerType != nil && *upd.PowerType != char.PowerType {
 		char.PowerType = *upd.PowerType
-		s.charsUpdsBarrier.UpdatePowerType(char.GUID, char.PowerType)
+		barrierUpd.PowerType = upd.PowerType
+		changed = true
 	}
 
 	if int(char.PowerType) < len(upd.Powers) {
 		if p := upd.Powers[char.PowerType]; p != nil && *p != char.CurPower {
 			char.CurPower = *p
-			s.charsUpdsBarrier.UpdatePower(char.GUID, char.CurPower)
+			barrierUpd.CurPower = p
+			changed = true
 		}
 
 		if p := upd.MaxPowers[char.PowerType]; p != nil && *p != char.MaxPower {
 			char.MaxPower = *p
-			s.charsUpdsBarrier.UpdateMaxPower(char.GUID, char.MaxPower)
+			barrierUpd.MaxPower = p
+			changed = true
 		}
 	}
 
 	if upd.Level != nil && *upd.Level != 0 && uint8(*upd.Level) != char.Level {
 		char.Level = uint8(*upd.Level)
-		s.charsUpdsBarrier.UpdateLevel(char.GUID, char.Level)
+		lvl := char.Level
+		barrierUpd.Lvl = &lvl
+		changed = true
 	}
 
 	if upd.CurHP != nil {
 		if dead := *upd.CurHP == 0; dead != char.IsDead {
 			char.IsDead = dead
-			s.charsUpdsBarrier.UpdateDeadState(char.GUID, dead)
+			barrierUpd.IsDead = &dead
+			changed = true
 		}
 	}
 
 	if upd.PlayerFlags != nil {
 		if ghost := *upd.PlayerFlags&packet.PlayerFlagGhost != 0; ghost != char.IsGhost {
 			char.IsGhost = ghost
-			s.charsUpdsBarrier.UpdateGhostState(char.GUID, ghost)
+			barrierUpd.IsGhost = &ghost
+			changed = true
 		}
 	}
 
@@ -166,6 +191,10 @@ func (s *GameSession) trackCharacterStats(ctx context.Context, data []byte) {
 				s.resendGroupListAfterCombat(ctx)
 			}
 		}
+	}
+
+	if changed {
+		s.charsUpdsBarrier.Update(barrierUpd)
 	}
 }
 
@@ -254,6 +283,9 @@ func (s *GameSession) InterceptMoveWorldPortAck(ctx context.Context, p *packet.P
 
 	s.worldSocket.Close()
 	s.worldSocket = nil
+	// The new world server drops STATUS_LOGGEDIN opcodes until the player is
+	// back in world; reopen the name query window until its SMsgTimeSyncReq.
+	s.worldEntryPending = true
 
 	go func(charGUID uint64) {
 		var err error
@@ -327,6 +359,15 @@ func (s *GameSession) InterceptAccountDataTimes(ctx context.Context, p *packet.P
 		s.packetSendingControl.accountDataTimesPerCharSent = true
 	default:
 	}
+	s.gameSocket.SendPacket(p)
+	return nil
+}
+
+// InterceptSMsgTimeSyncReq closes the name query window: the game server
+// sends its first SMSG_TIME_SYNC_REQ right after the player is added to the
+// map, so STATUS_LOGGEDIN opcodes are processed normally from that point on.
+func (s *GameSession) InterceptSMsgTimeSyncReq(ctx context.Context, p *packet.Packet) error {
+	s.worldEntryPending = false
 	s.gameSocket.SendPacket(p)
 	return nil
 }

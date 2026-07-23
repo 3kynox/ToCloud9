@@ -7,11 +7,9 @@
 
 namespace tc9 {
 
-// Publishes worldserver-originated events to NATS using the same JSON
-// envelopes as the gateway, so existing consumers (charserver, chatserver,
-// friends cache) receive them transparently. First use case: online status
-// for in-process sessions (e.g. server-side bots) that never cross a
-// gateway and therefore never trigger gateway login/logout events.
+// Publishes worldserver-originated messages to NATS. Payloads are opaque
+// bytes, so callers can reuse the JSON envelopes consumed by the Go
+// services or define their own subjects.
 class NatsPublisher {
 public:
     explicit NatsPublisher(const std::string& url);
@@ -20,8 +18,8 @@ public:
     void Start();
     void Stop();
 
-    // Thread-safe once Start() succeeded (cnats connections are
-    // thread-safe for publishing).
+    // Thread-safe: serialized with Start/Stop so the connection cannot
+    // be destroyed mid-publish.
     bool Publish(const std::string& subject, const std::string& payload);
 
     // Delete copy/move

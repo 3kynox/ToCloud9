@@ -57,8 +57,8 @@ void NatsPublisher::Stop() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (conn_) {
-        // Flush pending messages before closing so logged-out events
-        // emitted during shutdown are not lost.
+        // Flush pending messages before closing so events emitted
+        // during shutdown are not lost.
         natsConnection_FlushTimeout(conn_, 2000);
         natsConnection_Destroy(conn_);
         conn_ = nullptr;
@@ -67,6 +67,11 @@ void NatsPublisher::Stop() {
 }
 
 bool NatsPublisher::Publish(const std::string& subject, const std::string& payload) {
+    // Serializes with Start/Stop so conn_ is not destroyed mid-publish.
+    // natsConnection_Publish only buffers the message, the critical
+    // section stays short.
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!connected_ || !conn_) {
         spdlog::warn("NATS publisher not connected, dropping event on {}", subject);
         return false;

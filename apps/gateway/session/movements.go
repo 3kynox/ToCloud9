@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/walkline/ToCloud9/apps/gateway/packet"
+
+	"github.com/walkline/ToCloud9/shared/events"
 )
 
 // posPublishMinInterval throttles group position publishing: movement packets
@@ -57,5 +59,6 @@ func (s *GameSession) maybePublishPosition() {
 
 	char.lastPosPublishAt = now
 	char.lastPublishedPosX, char.lastPublishedPosY = char.PositionX, char.PositionY
-	s.charsUpdsBarrier.UpdatePosition(char.GUID, char.PositionX, char.PositionY)
+	posX, posY := char.PositionX, char.PositionY
+	s.charsUpdsBarrier.Update(events.CharacterUpdate{ID: char.GUID, PosX: &posX, PosY: &posY})
 }

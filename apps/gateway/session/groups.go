@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"time"
 
 	root "github.com/walkline/ToCloud9/apps/gateway"
 	eBroadcaster "github.com/walkline/ToCloud9/apps/gateway/events-broadcaster"
@@ -10,6 +11,7 @@ import (
 	pbChar "github.com/walkline/ToCloud9/gen/characters/pb"
 	"github.com/walkline/ToCloud9/gen/group/pb"
 	"github.com/walkline/ToCloud9/shared/events"
+	guidpkg "github.com/walkline/ToCloud9/shared/wow/guid"
 )
 
 type GroupOperation uint8
@@ -716,7 +718,7 @@ func (s *GameSession) HandleRequestPartyMemberStats(ctx context.Context, p *pack
 		// right answer, while a fabricated status would show a disconnected
 		// member as online with a full health bar. Pets and other non-player
 		// GUIDs (high type bits set) fall through too.
-		if guid>>48 == 0 && s.isOnlineInPlayersGroup(ctx, guid) {
+		if guidpkg.New(guid).GetHigh() == guidpkg.Player && s.isOnlineInPlayersGroup(ctx, guid) {
 			s.gameSocket.SendPacket(buildPartyMemberStatsPacket(&events.GroupMemberStatsUpdate{MemberGUID: guid}, nil))
 			return nil
 		}
@@ -749,25 +751,40 @@ func groupMemberStatsComplete(stats *events.GroupMemberStatsUpdate) bool {
 		stats.CurPower != nil && stats.MaxPower != nil && stats.Level != nil && stats.Zone != nil
 }
 
+// groupMembersSnapshotTTL bounds how often a stats request for an unknown GUID
+// may trigger a group service call.
+const groupMembersSnapshotTTL = time.Second * 3
+
 // isOnlineInPlayersGroup reports whether the given GUID belongs to the same group
-// as the session's character and that member is currently online.
+// as the session's character and that member is currently online. The membership
+// snapshot is memoized briefly so spamming requests with random GUIDs can't turn
+// into one RPC per packet.
 func (s *GameSession) isOnlineInPlayersGroup(ctx context.Context, guid uint64) bool {
-	gr, err := s.groupServiceClient.GetGroupByMember(ctx, &pb.GetGroupByMemberRequest{
-		Api:     root.SupportedGroupServiceVer,
-		RealmID: root.RealmID,
-		Player:  s.character.GUID,
-	})
-	if err != nil || gr.Group == nil {
+	if s.groupServiceClient == nil {
 		return false
 	}
 
-	for _, member := range gr.Group.Members {
-		if member.Guid == guid {
-			return member.IsOnline
+	if s.groupMembersSnapshot == nil || time.Since(s.groupMembersSnapshotAt) > groupMembersSnapshotTTL {
+		gr, err := s.groupServiceClient.GetGroupByMember(ctx, &pb.GetGroupByMemberRequest{
+			Api:     root.SupportedGroupServiceVer,
+			RealmID: root.RealmID,
+			Player:  s.character.GUID,
+		})
+		if err != nil {
+			return false
 		}
+
+		snapshot := map[uint64]bool{}
+		if gr.Group != nil {
+			for _, member := range gr.Group.Members {
+				snapshot[member.Guid] = member.IsOnline
+			}
+		}
+		s.groupMembersSnapshot = snapshot
+		s.groupMembersSnapshotAt = time.Now()
 	}
 
-	return false
+	return s.groupMembersSnapshot[guid]
 }
 
 // resendGroupListAfterCombat is a palliative for clients invited to a group while

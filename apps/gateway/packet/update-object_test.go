@@ -112,6 +112,32 @@ func TestParseUpdateObjectStatsIgnoresOtherGUIDs(t *testing.T) {
 	assert.True(t, upd.IsEmpty())
 }
 
+func TestParseUpdateObjectStatsSkipsFieldsBeyondStatsBlocks(t *testing.T) {
+	w := NewWriter(SMsgUpdateObject)
+	w.Uint32(2) // block count
+
+	// values block with fields far beyond the tracked ones (player fields area)
+	w.Uint8(updateTypeValues)
+	w.GUID(testCharGUID)
+	valuesPart(w, map[int]uint32{
+		unitFieldHealth:                 1234,
+		(maxStatsFieldsBlock+2)*32 + 3:  777,
+		(maxStatsFieldsBlock+3)*32 + 10: 888,
+	})
+
+	// following block must still be parsed at the right offset
+	w.Uint8(updateTypeValues)
+	w.GUID(testCharGUID)
+	valuesPart(w, map[int]uint32{unitFieldLevel: 42})
+
+	upd, err := ParseUpdateObjectStatsForGUID(w.ToPacket().Data, testCharGUID)
+	require.NoError(t, err)
+	require.NotNil(t, upd.CurHP)
+	assert.Equal(t, uint32(1234), *upd.CurHP)
+	require.NotNil(t, upd.Level)
+	assert.Equal(t, uint32(42), *upd.Level)
+}
+
 func TestParseUpdateObjectStatsCreateBlockWithMovement(t *testing.T) {
 	w := NewWriter(SMsgUpdateObject)
 	w.Uint32(3) // block count
