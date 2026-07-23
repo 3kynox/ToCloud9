@@ -476,7 +476,6 @@ TC9_API int TC9NatsSubscribe(const char* subject, TC9NatsMessageHandler handler)
             handler(subj.c_str(), payload.data(), static_cast<int>(payload.size()));
         }) ? 0 : -1;
 }
-}
 
 TC9_API int TC9GroupAcceptInvite(uint64_t playerGUID) {
     if (!g_state.initialized || !g_state.grpc_clients) {
