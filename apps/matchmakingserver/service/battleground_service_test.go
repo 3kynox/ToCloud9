@@ -4,7 +4,6 @@ import (
 	"sync"
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/walkline/ToCloud9/apps/matchmakingserver/battleground"
