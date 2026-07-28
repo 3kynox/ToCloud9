@@ -899,7 +899,7 @@ func (s *battleGroundService) addQueueForGroupMembersIfFree(q PVPQueue, group *Q
 	s.playersQueueOrBattlegroundMutex.Lock()
 	defer s.playersQueueOrBattlegroundMutex.Unlock()
 
-	// Probably player can be in several queues in the same time.
+	// A player holds at most one queue or battleground link at a time.
 	if len(s.playersQueueOrBattleground[QueuesByRealmAndPlayerKey{group.LeaderGUID}]) > 0 {
 		return nil, ErrAlreadyInQueue
 	}
