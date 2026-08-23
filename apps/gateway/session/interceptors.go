@@ -10,7 +10,6 @@ import (
 	"github.com/walkline/ToCloud9/apps/gateway/packet"
 	"github.com/walkline/ToCloud9/apps/gateway/sockets"
 	"github.com/walkline/ToCloud9/gen/characters/pb"
-	pbServ "github.com/walkline/ToCloud9/gen/servers-registry/pb"
 	"github.com/walkline/ToCloud9/shared/events"
 	"github.com/walkline/ToCloud9/shared/wow/guid"
 )
@@ -227,22 +226,16 @@ func (s *GameSession) InterceptMoveWorldPortAck(ctx context.Context, p *packet.P
 	s.teleportingToNewMap = nil
 	s.character.ignoreNextInterceptToNewMap = nil
 
-	serversResult, err := s.serversRegistryClient.AvailableGameServersForMapAndRealm(s.ctx, &pbServ.AvailableGameServersForMapAndRealmRequest{
-		Api:     root.SupportedCharServiceVer,
-		RealmID: root.RealmID,
-		MapID:   mapID,
-	})
-
+	desiredServer, err := s.selectGameServerForMap(ctx, mapID)
 	if err != nil {
 		return err
 	}
-
-	if len(serversResult.GameServers) == 0 {
+	if desiredServer == nil {
 		return fmt.Errorf("%w, mapID %v", worldConnectErrInstanceNotFound, mapID)
 	}
 
 	oldServerAddress := s.worldSocket.Address()
-	desiredServerAddress := serversResult.GameServers[0].Address
+	desiredServerAddress := desiredServer.Address
 
 	if desiredServerAddress == oldServerAddress {
 		return nil
@@ -290,7 +283,13 @@ func (s *GameSession) InterceptMoveWorldPortAck(ctx context.Context, p *packet.P
 	go func(charGUID uint64) {
 		var err error
 		var socket sockets.Socket
-		_, socket, err = s.connectToGameServer(context.Background(), charGUID, &mapID, nil)
+		s.gameServerGRPCConnMgr.AddAddressMapping(desiredServer.Address, desiredServer.GrpcAddress)
+		client, clientErr := s.gameServerGRPCConnMgr.GRPCConnByGameServerAddress(desiredServer.Address)
+		if clientErr != nil {
+			err = clientErr
+		} else {
+			socket, err = s.connectToGameServerWithAddress(context.Background(), charGUID, desiredServer.Address, nil)
+		}
 		if err != nil {
 			s.logger.Error().Err(err).Msg("failed to reconnect player to the world")
 			resp := packet.NewWriterWithSize(packet.SMsgCharacterLoginFailed, 1)
@@ -305,10 +304,13 @@ func (s *GameSession) InterceptMoveWorldPortAck(ctx context.Context, p *packet.P
 		s.sessionSafeFuChan <- func(session *GameSession) {
 			if session.character != nil {
 				session.worldSocket = socket
+				session.gameServerGRPCClient = client
+				session.currentGameServerID = desiredServer.ID
+				session.currentGameServerAlias = desiredServer.Alias
 			}
 
 			if session.showGameserverConnChangeToClient {
-				session.SendSysMessage(fmt.Sprintf("You have been redirected from %s to %s gameserver.", oldServerAddress, desiredServerAddress))
+				session.SendSysMessage(fmt.Sprintf("You have been moved to %s layer.", desiredServer.Alias))
 			}
 
 			go func() {
@@ -480,8 +482,6 @@ func (s *GameSession) buildNameQueryResponse(ctx context.Context, charGUID uint6
 }
 
 func (s *GameSession) HandleReadyForRedirectRequest(ctx context.Context, p *packet.Packet) error {
-	oldConnection := s.worldSocket.Address()
-
 	char, socket, err := s.connectToGameServer(ctx, s.character.GUID, nil, nil)
 	if err != nil {
 		return errors.New("failed to connect player to the new gameserver")
@@ -500,7 +500,7 @@ func (s *GameSession) HandleReadyForRedirectRequest(ctx context.Context, p *pack
 	}
 
 	if s.showGameserverConnChangeToClient {
-		s.SendSysMessage(fmt.Sprintf("You have been redirected from %s to %s gameserver.", oldConnection, s.worldSocket.Address()))
+		s.SendSysMessage(fmt.Sprintf("You have been moved to %s layer.", s.currentGameServerAlias))
 	}
 
 	return nil
