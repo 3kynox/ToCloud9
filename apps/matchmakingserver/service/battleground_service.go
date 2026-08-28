@@ -684,6 +684,12 @@ func (s *battleGroundService) PlayerJoinedBattleground(ctx context.Context, play
 		return nil
 	})
 	if err != nil {
+		// A rejected confirmation desyncs this service's team counts from the
+		// real battleground — the exact failure behind an observed 11v10.
+		log.Warn().Err(err).
+			Uint64("player", playerGUID).
+			Uint32("instance", instanceID).
+			Msg("join confirmation rejected")
 		return err
 	}
 
@@ -792,6 +798,13 @@ func (s *battleGroundService) RemovePlayerFromQueue(ctx context.Context, playerG
 				continue
 			}
 
+			// "Remove from queue" must never yank a seated participant out of
+			// a running match — active players leave through
+			// PlayerLeftBattleground only. Only invite/queue links are undone.
+			if bg.IsActivePlayer(playerGUID, realmID) {
+				continue
+			}
+
 			err = s.PlayerLeftBattleground(ctx, playerGUID, realmID, link.BattlegroundKey.InstanceID, link.BattlegroundKey.BattlegroupID != 0)
 			if err != nil {
 				return err
@@ -885,6 +898,11 @@ func (s *battleGroundService) processExpiredBattlegroundInvitesTick(ctx context.
 						log.Err(err).Msg("failed to remove invite from Battleground")
 						continue
 					}
+
+					log.Info().
+						Uint64("player", uint64(invite.GUID.LowGUID)).
+						Uint32("instance", bg.InstanceID).
+						Msg("battleground invite expired")
 
 					// Unlink only this battleground: RemovePlayerFromQueue
 					// removed the player from every battleground of the same
