@@ -81,6 +81,18 @@ public:
         uint32_t bg_type_id,
         uint32_t team_id);
 
+    // Group variant: one enqueue for a leader plus party members — the queue
+    // then treats them as one group, so a whole bot fill pops atomically
+    // instead of the match being created mid-batch.
+    bool EnqueueGroupToBattleground(
+        uint32_t realm_id,
+        uint64_t leader_guid,
+        uint32_t leader_lvl,
+        uint32_t bg_type_id,
+        uint32_t team_id,
+        const uint64_t* member_guids,
+        int member_count);
+
     // Removes a player from a battleground queue (leftover in-process
     // enqueues that were never invited, or out-of-bracket after a level up).
     bool RemovePlayerFromQueue(

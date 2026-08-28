@@ -643,6 +643,18 @@ TC9_API int TC9EnqueueLocalPlayerToBattleground(
         g_state.realm_id, playerGUID, playerLvl, bgTypeID, pvpTeamID) ? 0 : -1;
 }
 
+TC9_API int TC9EnqueueLocalGroupToBattleground(uint64_t leaderGUID, uint32_t leaderLvl,
+    uint32_t bgTypeID, uint32_t pvpTeamID, const uint64_t* memberGUIDs, int memberCount) {
+
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->EnqueueGroupToBattleground(
+        g_state.realm_id, leaderGUID, leaderLvl, bgTypeID, pvpTeamID,
+        memberGUIDs, memberCount) ? 0 : -1;
+}
+
 TC9_API int TC9RemovePlayerFromBattlegroundQueue(uint64_t playerGUID, uint32_t bgTypeID) {
     if (!g_state.initialized || !g_state.grpc_clients) {
         return -1;

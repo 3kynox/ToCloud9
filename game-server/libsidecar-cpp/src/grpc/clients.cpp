@@ -382,6 +382,47 @@ bool GrpcClients::EnqueueToBattleground(
     return true;
 }
 
+bool GrpcClients::EnqueueGroupToBattleground(
+    uint32_t realm_id,
+    uint64_t leader_guid,
+    uint32_t leader_lvl,
+    uint32_t bg_type_id,
+    uint32_t team_id,
+    const uint64_t* member_guids,
+    int member_count) {
+
+    if (!connected_ || !matchmaking_stub_) {
+        spdlog::error("Matchmaking client not connected");
+        return false;
+    }
+
+    v1::EnqueueToBattlegroundRequest request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_leaderguid(leader_guid);
+    request.set_leaderslvl(leader_lvl);
+    request.set_bgtypeid(bg_type_id);
+    request.set_teamid(static_cast<v1::PVPTeamID>(team_id));
+    for (int i = 0; i < member_count; ++i)
+        request.add_partymembers(member_guids[i]);
+
+    v1::EnqueueToBattlegroundResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = matchmaking_stub_->EnqueueToBattleground(&context, request, &response);
+
+    if (!status.ok()) {
+        spdlog::warn("EnqueueGroupToBattleground RPC failed: {} - {}",
+                    status.error_code(), status.error_message());
+        return false;
+    }
+
+    spdlog::debug("Enqueued group of {} (leader {}) to BG type {} (team {})",
+                 member_count + 1, leader_guid, bg_type_id, team_id);
+    return true;
+}
+
 bool GrpcClients::RemovePlayerFromQueue(
     uint32_t realm_id,
     uint64_t player_guid,
