@@ -643,6 +643,15 @@ TC9_API int TC9EnqueueLocalPlayerToBattleground(
         g_state.realm_id, playerGUID, playerLvl, bgTypeID, pvpTeamID) ? 0 : -1;
 }
 
+TC9_API int TC9RemovePlayerFromBattlegroundQueue(uint64_t playerGUID, uint32_t bgTypeID) {
+    if (!g_state.initialized || !g_state.grpc_clients) {
+        return -1;
+    }
+
+    return g_state.grpc_clients->RemovePlayerFromQueue(
+        g_state.realm_id, playerGUID, bgTypeID) ? 0 : -1;
+}
+
 TC9_API void TC9BattlegroundStatusChanged(uint32_t instanceID, uint8_t status) {
     if (!g_state.initialized) {
         return;

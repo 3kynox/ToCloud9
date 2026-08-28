@@ -138,6 +138,11 @@ TC9_API int TC9BattlegroundQueueDataForLocalPlayer(uint64_t playerGUID, uint32_t
  * Blocking gRPC call, do not call from map update threads. 0 on success. */
 TC9_API int TC9PlayerJoinedBattleground(uint64_t playerGUID, uint32_t instanceID);
 
+/* Remove a player from a battleground queue (leftover in-process enqueues
+ * that were never invited, or out-of-bracket after a level up). Blocking
+ * gRPC call, do not call from map update threads. 0 on success. */
+TC9_API int TC9RemovePlayerFromBattlegroundQueue(uint64_t playerGUID, uint32_t bgTypeID);
+
 /* Enqueue a solo in-process player into a battleground queue — the same RPC
  * the gateway issues for real players (pvpTeamID: 1 alliance, 2 horde).
  * Blocking gRPC call, do not call from map update threads. 0 on success. */

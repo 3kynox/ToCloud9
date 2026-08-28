@@ -81,6 +81,13 @@ public:
         uint32_t bg_type_id,
         uint32_t team_id);
 
+    // Removes a player from a battleground queue (leftover in-process
+    // enqueues that were never invited, or out-of-bracket after a level up).
+    bool RemovePlayerFromQueue(
+        uint32_t realm_id,
+        uint64_t player_guid,
+        uint32_t bg_type_id);
+
     // Resolves a game server's public address (host:port) from its registry
     // ID. Used to decide whether an assigned battleground is served by this
     // very worldserver.

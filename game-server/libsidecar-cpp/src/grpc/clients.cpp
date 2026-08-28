@@ -382,6 +382,38 @@ bool GrpcClients::EnqueueToBattleground(
     return true;
 }
 
+bool GrpcClients::RemovePlayerFromQueue(
+    uint32_t realm_id,
+    uint64_t player_guid,
+    uint32_t bg_type_id) {
+
+    if (!connected_ || !matchmaking_stub_) {
+        spdlog::error("Matchmaking client not connected");
+        return false;
+    }
+
+    v1::RemovePlayerFromQueueRequest request;
+    request.set_api(LIB_VERSION);
+    request.set_realmid(realm_id);
+    request.set_playerguid(player_guid);
+    request.set_battlegroundtype(bg_type_id);
+
+    v1::RemovePlayerFromQueueResponse response;
+    grpc::ClientContext context;
+    context.set_deadline(Deadline());
+
+    grpc::Status status = matchmaking_stub_->RemovePlayerFromQueue(&context, request, &response);
+
+    if (!status.ok()) {
+        spdlog::warn("RemovePlayerFromQueue RPC failed: {} - {}",
+                    status.error_code(), status.error_message());
+        return false;
+    }
+
+    spdlog::debug("Removed player {} from BG type {} queue", player_guid, bg_type_id);
+    return true;
+}
+
 bool GrpcClients::PlayerJoinedBattleground(
     uint32_t realm_id,
     uint64_t player_guid,
