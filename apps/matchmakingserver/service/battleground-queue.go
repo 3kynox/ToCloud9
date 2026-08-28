@@ -44,6 +44,11 @@ type PVPQueue interface {
 	QueuedGroupByPlayer(player guid.PlayerUnwrapped) *QueuedGroup
 
 	GetQueueTypeID() battleground.QueueTypeID
+
+	// ProcessBackfill re-runs the queue pass (backfill running battlegrounds,
+	// then create new ones): without it a slot freed by
+	// PlayerLeftBattleground is only filled on the next enqueue.
+	ProcessBackfill(ctx context.Context) error
 }
 
 type GenericBattlegroundQueue struct {
@@ -142,6 +147,10 @@ func (q *GenericBattlegroundQueue) QueuedGroupByPlayer(player guid.PlayerUnwrapp
 
 	group := q.queuedGroups[leaderGuid]
 	return &group
+}
+
+func (q *GenericBattlegroundQueue) ProcessBackfill(ctx context.Context) error {
+	return q.process(ctx)
 }
 
 func (q *GenericBattlegroundQueue) process(ctx context.Context) error {
