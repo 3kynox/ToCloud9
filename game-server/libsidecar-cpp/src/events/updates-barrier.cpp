@@ -28,18 +28,20 @@ void CharacterUpdatesBarrier::Start() {
 }
 
 void CharacterUpdatesBarrier::Stop() {
+    bool was_running = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_) {
-            return;
-        }
+        was_running = running_;
         running_ = false;
     }
-    cv_.notify_all();
-    if (thread_.joinable()) {
-        thread_.join();
+    if (was_running) {
+        cv_.notify_all();
+        if (thread_.joinable()) {
+            thread_.join();
+        }
     }
-    // Flush leftovers so updates emitted during shutdown are not lost.
+    // Flush leftovers unconditionally: updates can be queued while the
+    // barrier is stopped (or before Start) and must not be lost.
     flush();
 }
 

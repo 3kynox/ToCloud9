@@ -471,6 +471,7 @@ if(BUILD_TESTS)
         tests/config_test.cpp
         tests/error_test.cpp
         tests/guid_manager_test.cpp
+        tests/updates_barrier_test.cpp
         tests/request_processing_benchmark.cpp
         tests/request_processing_realistic_benchmark.cpp
     )
