@@ -56,6 +56,23 @@ void CharacterUpdatesBarrier::UpdateLevel(uint64_t charGUID, uint8_t level) {
     pending_[charGUID].level = level;
 }
 
+void CharacterUpdatesBarrier::UpdateVitals(uint64_t charGUID, uint8_t level, uint32_t curHP, uint32_t maxHP,
+                                           uint8_t powerType, uint32_t curPower, uint32_t maxPower,
+                                           float posX, float posY, bool isDead, bool isGhost) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto& upd = pending_[charGUID];
+    upd.level = level;
+    upd.curHP = curHP;
+    upd.maxHP = maxHP;
+    upd.powerType = powerType;
+    upd.curPower = curPower;
+    upd.maxPower = maxPower;
+    upd.posX = posX;
+    upd.posY = posY;
+    upd.isDead = isDead;
+    upd.isGhost = isGhost;
+}
+
 void CharacterUpdatesBarrier::run() {
     for (;;) {
         {
@@ -94,6 +111,33 @@ void CharacterUpdatesBarrier::flush() {
             }
             if (upd.zone) {
                 item["z"] = *upd.zone;
+            }
+            if (upd.curHP) {
+                item["h"] = *upd.curHP;
+            }
+            if (upd.maxHP) {
+                item["hm"] = *upd.maxHP;
+            }
+            if (upd.powerType) {
+                item["pt"] = *upd.powerType;
+            }
+            if (upd.curPower) {
+                item["p"] = *upd.curPower;
+            }
+            if (upd.maxPower) {
+                item["pm"] = *upd.maxPower;
+            }
+            if (upd.posX) {
+                item["x"] = *upd.posX;
+            }
+            if (upd.posY) {
+                item["y"] = *upd.posY;
+            }
+            if (upd.isDead) {
+                item["d"] = *upd.isDead;
+            }
+            if (upd.isGhost) {
+                item["g"] = *upd.isGhost;
             }
             batch.push_back(std::move(item));
 

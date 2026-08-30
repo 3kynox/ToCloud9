@@ -482,6 +482,32 @@ TC9_API void TC9CharacterLevelChanged(uint64_t charGUID, uint8_t level) {
     }
 }
 
+TC9_API void TC9CharacterVitalsUpdated(
+    uint64_t charGUID,
+    uint8_t level,
+    uint32_t curHP,
+    uint32_t maxHP,
+    uint8_t powerType,
+    uint32_t curPower,
+    uint32_t maxPower,
+    float posX,
+    float posY,
+    uint8_t isDead,
+    uint8_t isGhost) {
+
+    if (!g_state.initialized || !g_state.updates_barrier) {
+        return;
+    }
+
+    try {
+        g_state.updates_barrier->UpdateVitals(charGUID, level, curHP, maxHP, powerType,
+                                              curPower, maxPower, posX, posY,
+                                              isDead != 0, isGhost != 0);
+    } catch (const std::exception& e) {
+        spdlog::error("Error queueing character vitals update: {}", e.what());
+    }
+}
+
 TC9_API int TC9NatsPublish(const char* subject, const char* payload, int payloadLen) {
     if (!subject || payloadLen < 0 || (payloadLen > 0 && !payload)) {
         return -1;
