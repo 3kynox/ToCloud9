@@ -1132,7 +1132,7 @@ TC9_API void TC9SetOnGroupMemberRemovedHook(OnGroupMemberRemovedHook hook) {
 
     tc9::EventHooks::Instance().RegisterGroupMemberRemoved([](TC9EventGroupMemberRemoved event) {
         if (stored_hook) {
-            stored_hook(event.groupGuid, event.memberGuid, 0);  // newLeaderGuid not in TC9
+            stored_hook(event.groupGuid, event.memberGuid, event.newLeaderGuid);
         }
     });
 }
