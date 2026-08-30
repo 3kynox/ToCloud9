@@ -654,7 +654,9 @@ func (s *battleGroundService) PlayerLeftBattleground(ctx context.Context, player
 		}][queueTypeID]; ok {
 			if queue, ok := bracketsMap[BracketID(bracketID)]; ok {
 				go func() {
-					if err := queue.ProcessBackfill(context.Background()); err != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+					defer cancel()
+					if err := queue.ProcessBackfill(ctx); err != nil {
 						log.Err(err).Msg("backfill pass after player left battleground failed")
 					}
 				}()
