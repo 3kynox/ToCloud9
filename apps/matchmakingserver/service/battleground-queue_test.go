@@ -152,8 +152,14 @@ func TestGenericBattlegroundQueue_BalancedBGBackfillsTowardMax(t *testing.T) {
 	mockService := new(mocks.BattleGroundService)
 	mockService.On("BattlegroundsThatNeedPlayers", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]battleground.Battleground{runningBG}, nil)
 	mockService.On("TemplateForQueueTypeID", mock.Anything, mock.Anything).Return(template, nil)
-	invited := false
-	mockService.On("InviteGroups", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(mock.Arguments) { invited = true }).Return(nil)
+	invites := 0
+	var invitedGroups []service.QueuedGroup
+	var invitedTeam battleground.PVPTeam
+	mockService.On("InviteGroups", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		invites++
+		invitedGroups = args.Get(1).([]service.QueuedGroup)
+		invitedTeam = args.Get(3).(battleground.PVPTeam)
+	}).Return(nil)
 
 	queue := service.NewGenericBattlegroundQueue(mockService, bgCreatorMock(func(ctx context.Context, template repo.BattlegroundTemplate, queueType battleground.QueueTypeID, bracketID service.BracketID, realmID, battlegroupID uint32, allianceGroups, hordeGroups []service.QueuedGroup) error {
 		return nil
@@ -162,7 +168,9 @@ func TestGenericBattlegroundQueue_BalancedBGBackfillsTowardMax(t *testing.T) {
 	// 5-player alliance group queues while the 5v5 match runs: it is invited
 	// into the running instance (5 free alliance slots up to the max of 10).
 	assert.NoError(t, queue.AddQueuedGroup(groupWithMembers(5, battleground.TeamAlliance)))
-	assert.True(t, invited, "group must backfill into the running battleground")
+	assert.Equal(t, 1, invites, "group must backfill into the running battleground exactly once")
+	assert.Equal(t, battleground.TeamAlliance, invitedTeam, "backfill must target the queued group's team")
+	assert.Len(t, invitedGroups, 1, "exactly the one queued group is invited")
 	assert.Len(t, queue.GetAllQueuedGroups(), 0, "invited group leaves the queue")
 
 	mockService.AssertExpectations(t)
