@@ -203,7 +203,7 @@ TC9_API void TC9InitLib(
             realmID,
             isCrossRealm,
             availableMaps ? availableMaps : "",
-            "",  // preferred hostname (empty = auto)
+            config.preferred_hostname(),
             server_id,
             assigned_maps_vec
         );
