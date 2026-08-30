@@ -22,7 +22,9 @@ namespace tc9 {
 class CharacterUpdatesBarrier {
 public:
     // Receives the merged updates as a JSON array of
-    // shared/events.CharacterUpdate objects ("i"/"l"/"m"/"a"/"z" keys).
+    // shared/events.CharacterUpdate objects: "i"/"l"/"m"/"a"/"z"
+    // (identity, level, map, area, zone) plus the vitals keys
+    // "h"/"hm"/"pt"/"p"/"pm"/"x"/"y"/"d"/"g" when UpdateVitals is used.
     using FlushFn = std::function<void(nlohmann::json updates)>;
 
     CharacterUpdatesBarrier(FlushFn flushFn, std::chrono::milliseconds interval);
