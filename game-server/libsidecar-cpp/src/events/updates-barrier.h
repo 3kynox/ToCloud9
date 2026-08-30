@@ -35,6 +35,14 @@ public:
     void UpdateZone(uint64_t charGUID, uint32_t mapID, uint32_t areaID, uint32_t zoneID);
     void UpdateLevel(uint64_t charGUID, uint8_t level);
 
+    // Full vitals snapshot for characters that have no gateway watching their
+    // traffic (in-process bots): without it, group members on other servers
+    // never receive their level/health and the client renders a skull and an
+    // empty bar. Thread-safe.
+    void UpdateVitals(uint64_t charGUID, uint8_t level, uint32_t curHP, uint32_t maxHP,
+                      uint8_t powerType, uint32_t curPower, uint32_t maxPower,
+                      float posX, float posY, bool isDead, bool isGhost);
+
     // Delete copy/move
     CharacterUpdatesBarrier(const CharacterUpdatesBarrier&) = delete;
     CharacterUpdatesBarrier& operator=(const CharacterUpdatesBarrier&) = delete;
@@ -47,6 +55,15 @@ private:
         std::optional<uint32_t> map;
         std::optional<uint32_t> area;
         std::optional<uint32_t> zone;
+        std::optional<uint32_t> curHP;
+        std::optional<uint32_t> maxHP;
+        std::optional<uint8_t> powerType;
+        std::optional<uint32_t> curPower;
+        std::optional<uint32_t> maxPower;
+        std::optional<float> posX;
+        std::optional<float> posY;
+        std::optional<bool> isDead;
+        std::optional<bool> isGhost;
     };
 
     void run();

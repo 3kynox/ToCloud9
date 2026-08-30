@@ -74,6 +74,16 @@ TC9_API void TC9CharacterLoggedOut(uint64_t charGUID, const char* charName, uint
 TC9_API void TC9CharacterZoneChanged(uint64_t charGUID, uint32_t mapID, uint32_t areaID, uint32_t zoneID);
 TC9_API void TC9CharacterLevelChanged(uint64_t charGUID, uint8_t level);
 
+/* Full vitals snapshot (level/health/power/position/death state) for a
+ * character WITHOUT a gateway connection (in-process bot). The gateway
+ * builds SMSG_PARTY_MEMBER_STATS for cross-server group members from these
+ * fields; without them the client renders a skull and an empty bar. Call
+ * periodically for bots that are in a group. */
+TC9_API void TC9CharacterVitalsUpdated(uint64_t charGUID, uint8_t level, uint32_t curHP,
+                                       uint32_t maxHP, uint8_t powerType, uint32_t curPower,
+                                       uint32_t maxPower, float posX, float posY,
+                                       uint8_t isDead, uint8_t isGhost);
+
 /* Generic NATS pub/sub. Payloads are opaque bytes, subjects are arbitrary.
  * Subscription callbacks run on the thread draining TC9ProcessEventsHooks
  * (the world update thread), not on the NATS delivery thread. Both return
