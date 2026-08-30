@@ -46,7 +46,7 @@ build-servers-registry:
 
 build-sidecar:
 	cmake -S game-server/libsidecar-cpp -B game-server/libsidecar-cpp/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
-	cmake --build game-server/libsidecar-cpp/build -j
+	cmake --build game-server/libsidecar-cpp/build -j $(nproc)
 	cp game-server/libsidecar-cpp/build/libsidecar.so $(INSTALL_PATH)/libsidecar.so
 
 # Deprecated: the Go/cgo sidecar is superseded by game-server/libsidecar-cpp

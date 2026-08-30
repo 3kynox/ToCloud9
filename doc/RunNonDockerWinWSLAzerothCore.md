@@ -38,7 +38,7 @@ Let's start with getting libsidecar. The maintained implementation is the C++ on
 2. To build: open the ToCloud9 folder downloaded from previous steps in the WSL terminal and run:
 ```
 cmake -S game-server/libsidecar-cpp -B game-server/libsidecar-cpp/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
-cmake --build game-server/libsidecar-cpp/build -j
+cmake --build game-server/libsidecar-cpp/build -j $(nproc)
 cp game-server/libsidecar-cpp/build/libsidecar.so bin/libsidecar.so
 ```
 (or simply `make build-sidecar`, which does the same).
