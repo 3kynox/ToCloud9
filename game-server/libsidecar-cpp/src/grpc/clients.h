@@ -85,7 +85,8 @@ public:
 
     // Group variant: one enqueue for a leader plus party members — the queue
     // then treats them as one group, so a whole fill pops atomically
-    // instead of the match being created mid-batch.
+    // instead of the match being created mid-batch. member_guids excludes
+    // the leader (sent separately as leader_guid, like the gateway does).
     bool EnqueueGroupToBattleground(
         uint32_t realm_id,
         uint64_t leader_guid,

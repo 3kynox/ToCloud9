@@ -93,7 +93,9 @@ TC9_API int TC9EnqueueLocalPlayerToBattleground(uint64_t playerGUID, uint32_t pl
 
 /* Group enqueue: leader plus party members in ONE queue entry, so a whole
  * group fill pops one full battleground instead of the matchmaking creating
- * the match mid-batch. Blocking gRPC call. 0 on success. */
+ * the match mid-batch. memberGUIDs lists the OTHER party members only — the
+ * leader travels as leaderGUID and must not be repeated, exactly like the
+ * gateway's PartyMembers field. Blocking gRPC call. 0 on success. */
 TC9_API int TC9EnqueueLocalGroupToBattleground(uint64_t leaderGUID, uint32_t leaderLvl,
     uint32_t bgTypeID, uint32_t pvpTeamID, const uint64_t* memberGUIDs, int memberCount);
 
