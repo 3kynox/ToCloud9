@@ -6,8 +6,12 @@
  *   - lifecycle calls are safe no-ops,
  *   - GUID getters return 0,
  *   - NATS publish/subscribe report failure,
- *   - Call* helpers report NoHandler/NoHook until a handler is set,
- *   - hook Call* helpers forward every argument once a hook is set.
+ *   - every Call* helper reports NoHandler/NoHook while nothing is
+ *     registered,
+ *   - hook Call* helpers (guild/group/registry/monitoring) forward every
+ *     argument once a hook is set; the gRPC-request families keep
+ *     reporting NoHandler by design — their live path is the gRPC
+ *     service — so only their no-handler contract is asserted.
  * TC9InitLib is intentionally never called: it needs live services.
  */
 
@@ -326,6 +330,24 @@ int main(void) {
     TC9SetCanPlayerJoinBattlegroundQueueHandler(bg_can_join_handler);
     TC9SetCanPlayerTeleportToBattlegroundHandler(bg_can_teleport_handler);
     printf("  all TC9Set* calls OK\n");
+
+    /* Go-era Set* of the gRPC-request families: the live path goes through
+     * the gRPC service and the stored bindings, so these shims only store
+     * the pointer today — referencing them still pins the exported ABI
+     * surface (a removed or renamed export fails this build). */
+    printf("\nReferencing Go-era Set* helpers of the gRPC-request families...\n");
+    SetGetPlayerItemsByGuidsHandler(get_items_handler);
+    SetRemoveItemsWithGuidsFromPlayerHandler(remove_items_handler);
+    SetAddExistingItemToPlayerHandler(add_item_handler);
+    SetGetMoneyForPlayerHandler(get_money_handler);
+    SetModifyMoneyForPlayerHandler(modify_money_handler);
+    SetCanPlayerInteractWithNPCAndFlagsHandler(interact_npc_handler);
+    SetCanPlayerInteractWithGOAndTypeHandler(interact_go_handler);
+    SetBattlegroundStartHandler(bg_start_handler);
+    SetBattlegroundAddPlayersHandler(bg_add_players_handler);
+    SetCanPlayerJoinBattlegroundQueueHandler(bg_can_join_handler);
+    SetCanPlayerTeleportToBattlegroundHandler(bg_can_teleport_handler);
+    printf("  all Go-era Set* calls OK\n");
 
     /* Hook round-trips through the Go-era Set and Call helpers */
     printf("\nTesting hook round-trips (Set* then Call*)...\n");
